@@ -32,8 +32,8 @@ export default function ProfilePage() {
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      firstName: "John",
-      lastName: "Employee",
+      firstName: user?.first_name || "John",
+      lastName: user?.last_name || "Employee",
       email: user?.email || "",
       phone: "+1 (555) 123-4567",
       address: "123 Main St, City, State 12345",
@@ -48,8 +48,21 @@ export default function ProfilePage() {
     setIsEditing(false);
   };
 
-  const getInitials = (name: string) => {
-    return name.split(" ").map((n) => n[0]).join("").toUpperCase();
+  const getInitials = (firstName?: string, lastName?: string) => {
+    const initials = [];
+    if (firstName) initials.push(firstName[0]);
+    if (lastName) initials.push(lastName[0]);
+    return initials.join("").toUpperCase() || "U";
+  };
+
+  const getUserDisplayName = () => {
+    if (user?.first_name && user?.last_name) {
+      return `${user.first_name} ${user.last_name}`;
+    }
+    if (user?.first_name) {
+      return user.first_name;
+    }
+    return "User";
   };
 
   return (
@@ -67,9 +80,9 @@ export default function ProfilePage() {
           </CardHeader>
           <CardContent className="flex flex-col items-center space-y-4">
             <Avatar className="h-32 w-32">
-              <AvatarImage src={user?.avatar} />
+              <AvatarImage src={user?.avatar_url} />
               <AvatarFallback className="text-2xl">
-                {user?.name ? getInitials(user.name) : "JE"}
+                {getInitials(user?.first_name, user?.last_name)}
               </AvatarFallback>
             </Avatar>
             <Button variant="outline" size="sm" onClick={() => toast.info("Photo upload not implemented yet")}>
