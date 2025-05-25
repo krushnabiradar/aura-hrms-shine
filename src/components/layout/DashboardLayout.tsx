@@ -28,18 +28,30 @@ export function DashboardLayout({ children, sidebar }: DashboardLayoutProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    toast.success("Logged out successfully");
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success("Logged out successfully");
+      navigate("/auth");
+    } catch (error) {
+      toast.error("Error logging out");
+    }
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
+  const getInitials = (firstName?: string, lastName?: string) => {
+    if (firstName && lastName) {
+      return `${firstName[0]}${lastName[0]}`.toUpperCase();
+    }
+    if (firstName) return firstName[0].toUpperCase();
+    return "U";
+  };
+
+  const getDisplayName = () => {
+    if (user?.first_name && user?.last_name) {
+      return `${user.first_name} ${user.last_name}`;
+    }
+    if (user?.first_name) return user.first_name;
+    return user?.email || "User";
   };
 
   return (
@@ -88,16 +100,21 @@ export function DashboardLayout({ children, sidebar }: DashboardLayoutProps) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                     <Avatar>
-                      <AvatarImage src={user?.avatar} />
-                      <AvatarFallback>{user?.name ? getInitials(user.name) : "U"}</AvatarFallback>
+                      <AvatarImage src={user?.avatar_url} />
+                      <AvatarFallback>
+                        {getInitials(user?.first_name, user?.last_name)}
+                      </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <div className="flex items-center justify-start gap-2 p-2">
                     <div className="flex flex-col space-y-1 leading-none">
-                      <p className="font-medium">{user?.name}</p>
+                      <p className="font-medium">{getDisplayName()}</p>
                       <p className="text-xs text-muted-foreground">{user?.email}</p>
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {user?.role?.replace('_', ' ')}
+                      </p>
                     </div>
                   </div>
                   <DropdownMenuSeparator />

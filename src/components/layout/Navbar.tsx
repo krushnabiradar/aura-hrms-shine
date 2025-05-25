@@ -53,8 +53,8 @@ const Navbar = () => {
           break;
       }
     } else {
-      // If not authenticated, go to login page
-      navigate('/login');
+      // If not authenticated, go to auth page
+      navigate('/auth');
     }
   };
 

@@ -12,7 +12,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
-import Login from "./pages/Login";
+import Auth from "./pages/Auth";
 import SystemAdminDashboard from "./pages/system-admin/SystemAdminDashboard";
 import TenantAdminDashboard from "./pages/tenant-admin/TenantAdminDashboard";
 import EmployeeDashboard from "./pages/ess/EmployeeDashboard";
@@ -30,7 +30,8 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/landing" element={<Landing />} />
-              <Route path="/login" element={<Login />} />
+              <Route path="/login" element={<Auth />} />
+              <Route path="/auth" element={<Auth />} />
               
               {/* System Admin Routes */}
               <Route element={<ProtectedRoute allowedRoles={["system_admin"]} />}>

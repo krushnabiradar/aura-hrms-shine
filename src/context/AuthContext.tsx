@@ -1,103 +1,152 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import { Database } from '@/integrations/supabase/types';
 
-// Define our user roles
-export type UserRole = 'system_admin' | 'tenant_admin' | 'employee';
+// Use the enum from the database types
+export type UserRole = Database['public']['Enums']['user_role'];
 
-// Define our user and auth types
+// Define our user type based on the profiles table
 export interface User {
   id: string;
-  name: string;
   email: string;
+  first_name?: string;
+  last_name?: string;
   role: UserRole;
-  tenantId?: string; // Only for tenant_admin and employee roles
-  avatar?: string;
+  tenant_id?: string;
+  avatar_url?: string;
 }
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   isLoading: boolean;
-  login: (email: string, password: string, role?: UserRole) => Promise<void>;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, userData?: { first_name?: string; last_name?: string; role?: UserRole }) => Promise<void>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
-// Create the auth context with default values
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Sample users for demonstration (will be replaced with actual authentication)
-const SAMPLE_USERS: Record<string, User> = {
-  system_admin: {
-    id: 'sa-1',
-    name: 'System Administrator',
-    email: 'admin@aurahrms.com',
-    role: 'system_admin',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
-  },
-  tenant_admin: {
-    id: 'ta-1',
-    name: 'Tenant Administrator',
-    email: 'hradmin@company.com',
-    role: 'tenant_admin',
-    tenantId: 'tenant-1',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=hradmin',
-  },
-  employee: {
-    id: 'emp-1',
-    name: 'John Employee',
-    email: 'john@company.com',
-    role: 'employee',
-    tenantId: 'tenant-1',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=employee',
-  },
-};
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing session on mount
-  useEffect(() => {
-    const storedUser = localStorage.getItem('hrms_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+  // Fetch user profile from profiles table
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return null;
+      }
+
+      return profile;
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+      return null;
     }
-    setIsLoading(false);
+  };
+
+  // Set up auth state listener
+  useEffect(() => {
+    // Set up the auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
+        setSession(session);
+        
+        if (session?.user) {
+          // Fetch the user profile when logged in
+          const profile = await fetchUserProfile(session.user.id);
+          if (profile) {
+            setUser({
+              id: profile.id,
+              email: profile.email,
+              first_name: profile.first_name,
+              last_name: profile.last_name,
+              role: profile.role,
+              tenant_id: profile.tenant_id,
+              avatar_url: profile.avatar_url
+            });
+          }
+        } else {
+          setUser(null);
+        }
+        
+        setIsLoading(false);
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session?.user?.id);
+      setSession(session);
+      
+      if (session?.user) {
+        fetchUserProfile(session.user.id).then(profile => {
+          if (profile) {
+            setUser({
+              id: profile.id,
+              email: profile.email,
+              first_name: profile.first_name,
+              last_name: profile.last_name,
+              role: profile.role,
+              tenant_id: profile.tenant_id,
+              avatar_url: profile.avatar_url
+            });
+          }
+          setIsLoading(false);
+        });
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string, role?: UserRole) => {
+  const signup = async (email: string, password: string, userData?: { first_name?: string; last_name?: string; role?: UserRole }) => {
     setIsLoading(true);
-    
     try {
-      // Simulating authentication delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Simple demo authentication logic (to be replaced with real auth)
-      let matchedUser: User | null = null;
-      
-      // If role is specified, look for a user with that specific role
-      if (role) {
-        const user = SAMPLE_USERS[role];
-        if (user && user.email === email) {
-          matchedUser = user;
-        }
-      } else {
-        // If no role specified, check all users
-        for (const key in SAMPLE_USERS) {
-          const user = SAMPLE_USERS[key];
-          if (user.email === email) {
-            matchedUser = user;
-            break;
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: userData?.first_name || '',
+            last_name: userData?.last_name || '',
+            role: userData?.role || 'employee'
           }
         }
-      }
-      
-      if (matchedUser) {
-        setUser(matchedUser);
-        localStorage.setItem('hrms_user', JSON.stringify(matchedUser));
-      } else {
-        throw new Error('Invalid credentials');
-      }
+      });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Signup error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) throw error;
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -106,18 +155,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('hrms_user');
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    }
   };
 
   return (
     <AuthContext.Provider value={{ 
       user, 
+      session,
       isLoading, 
-      login, 
+      login,
+      signup, 
       logout,
-      isAuthenticated: !!user 
+      isAuthenticated: !!session 
     }}>
       {children}
     </AuthContext.Provider>
