@@ -19,6 +19,7 @@ const Auth = () => {
   const [role, setRole] = useState<UserRole>('employee');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   
   const { login, signup, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -38,8 +39,10 @@ const Auth = () => {
 
     try {
       await login(email, password);
+      console.log('Login successful, navigating to:', from);
       navigate(from, { replace: true });
     } catch (err: any) {
+      console.error('Login error:', err);
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsSubmitting(false);
@@ -55,6 +58,7 @@ const Auth = () => {
 
     setIsSubmitting(true);
     setError('');
+    setSuccessMessage('');
 
     try {
       await signup(email, password, {
@@ -64,9 +68,17 @@ const Auth = () => {
       });
       
       setError('');
-      // Show success message
-      alert('Account created successfully! Please check your email to verify your account.');
+      setSuccessMessage('Account created successfully! You can now sign in.');
+      console.log('Signup successful');
+      
+      // Clear the form
+      setEmail('');
+      setPassword('');
+      setFirstName('');
+      setLastName('');
+      setRole('employee');
     } catch (err: any) {
+      console.error('Signup error:', err);
       setError(err.message || 'Signup failed. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -127,6 +139,12 @@ const Auth = () => {
                 {error && (
                   <Alert variant="destructive">
                     <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                
+                {successMessage && (
+                  <Alert>
+                    <AlertDescription>{successMessage}</AlertDescription>
                   </Alert>
                 )}
                 
@@ -212,6 +230,12 @@ const Auth = () => {
                 {error && (
                   <Alert variant="destructive">
                     <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                
+                {successMessage && (
+                  <Alert>
+                    <AlertDescription>{successMessage}</AlertDescription>
                   </Alert>
                 )}
                 

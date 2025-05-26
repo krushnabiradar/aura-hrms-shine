@@ -7,11 +7,14 @@ import { useEffect } from "react";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   // If user is already logged in, redirect to their dashboard
   useEffect(() => {
-    if (isAuthenticated && user) {
+    console.log('Index useEffect - isAuthenticated:', isAuthenticated, 'user:', user, 'isLoading:', isLoading);
+    
+    if (!isLoading && isAuthenticated && user) {
+      console.log('Redirecting user with role:', user.role);
       switch (user.role) {
         case "system_admin":
           navigate("/system-admin");
@@ -22,12 +25,28 @@ const Index = () => {
         case "employee":
           navigate("/ess");
           break;
+        default:
+          console.warn('Unknown user role:', user.role);
+          navigate("/ess"); // Default to employee dashboard
+          break;
       }
-    } else {
+    } else if (!isLoading && !isAuthenticated) {
       // If not authenticated, redirect to landing page
+      console.log('User not authenticated, redirecting to landing');
       navigate("/landing");
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, isLoading, navigate]);
+
+  // Show a loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show a minimal loading state while redirecting
   return (

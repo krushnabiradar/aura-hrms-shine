@@ -35,9 +35,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch user profile from profiles table
-  const fetchUserProfile = async (userId: string) => {
+  // Create profile if it doesn't exist
+  const createProfileIfMissing = async (supabaseUser: SupabaseUser, userData?: { first_name?: string; last_name?: string; role?: UserRole }) => {
     try {
+      console.log('Creating profile for user:', supabaseUser.id);
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .insert({
+          id: supabaseUser.id,
+          email: supabaseUser.email || '',
+          first_name: userData?.first_name || '',
+          last_name: userData?.last_name || '',
+          role: userData?.role || 'employee'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating profile:', error);
+        return null;
+      }
+
+      console.log('Profile created successfully:', profile);
+      return profile;
+    } catch (error) {
+      console.error('Error in createProfileIfMissing:', error);
+      return null;
+    }
+  };
+
+  // Fetch user profile from profiles table
+  const fetchUserProfile = async (userId: string, userData?: { first_name?: string; last_name?: string; role?: UserRole }) => {
+    try {
+      console.log('Fetching profile for user:', userId);
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -46,9 +76,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (error) {
         console.error('Error fetching user profile:', error);
+        
+        // If profile doesn't exist, try to create it
+        if (error.code === 'PGRST116') {
+          console.log('Profile not found, creating new profile');
+          const supabaseUser = (await supabase.auth.getUser()).data.user;
+          if (supabaseUser) {
+            return await createProfileIfMissing(supabaseUser, userData);
+          }
+        }
         return null;
       }
 
+      console.log('Profile fetched successfully:', profile);
       return profile;
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
@@ -58,6 +98,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Set up auth state listener
   useEffect(() => {
+    console.log('Setting up auth state listener');
+    
     // Set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -117,7 +159,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signup = async (email: string, password: string, userData?: { first_name?: string; last_name?: string; role?: UserRole }) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log('Starting signup process for:', email);
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -130,6 +173,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (error) throw error;
+
+      console.log('Signup successful:', data);
+
+      // If user is immediately confirmed, fetch/create profile
+      if (data.user && data.session) {
+        console.log('User confirmed immediately, fetching profile');
+        const profile = await fetchUserProfile(data.user.id, userData);
+        if (profile) {
+          setUser({
+            id: profile.id,
+            email: profile.email,
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            role: profile.role,
+            tenant_id: profile.tenant_id,
+            avatar_url: profile.avatar_url
+          });
+        }
+      }
     } catch (error) {
       console.error('Signup error:', error);
       throw error;
@@ -141,12 +203,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log('Starting login process for:', email);
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
       if (error) throw error;
+
+      console.log('Login successful:', data);
     } catch (error) {
       console.error('Login error:', error);
       throw error;
