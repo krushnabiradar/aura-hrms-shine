@@ -35,37 +35,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Create profile if it doesn't exist
-  const createProfileIfMissing = async (supabaseUser: SupabaseUser, userData?: { first_name?: string; last_name?: string; role?: UserRole }) => {
+  // Create profile from user metadata if missing
+  const createProfileFromMetadata = async (supabaseUser: SupabaseUser) => {
     try {
-      console.log('Creating profile for user:', supabaseUser.id);
+      console.log('Creating profile from user metadata for:', supabaseUser.id);
+      
+      const userData = supabaseUser.user_metadata || {};
+      const profileData = {
+        id: supabaseUser.id,
+        email: supabaseUser.email || '',
+        first_name: userData.first_name || '',
+        last_name: userData.last_name || '',
+        role: (userData.role as UserRole) || 'employee' as UserRole
+      };
+
+      console.log('Profile data to insert:', profileData);
+
       const { data: profile, error } = await supabase
         .from('profiles')
-        .insert({
-          id: supabaseUser.id,
-          email: supabaseUser.email || '',
-          first_name: userData?.first_name || '',
-          last_name: userData?.last_name || '',
-          role: userData?.role || 'employee'
-        })
+        .insert(profileData)
         .select()
         .single();
 
       if (error) {
-        console.error('Error creating profile:', error);
+        console.error('Error creating profile from metadata:', error);
         return null;
       }
 
-      console.log('Profile created successfully:', profile);
+      console.log('Profile created successfully from metadata:', profile);
       return profile;
     } catch (error) {
-      console.error('Error in createProfileIfMissing:', error);
+      console.error('Error in createProfileFromMetadata:', error);
       return null;
     }
   };
 
-  // Fetch user profile from profiles table
-  const fetchUserProfile = async (userId: string, userData?: { first_name?: string; last_name?: string; role?: UserRole }) => {
+  // Fetch user profile from profiles table with fallback creation
+  const fetchUserProfile = async (userId: string) => {
     try {
       console.log('Fetching profile for user:', userId);
       const { data: profile, error } = await supabase
@@ -77,12 +83,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) {
         console.error('Error fetching user profile:', error);
         
-        // If profile doesn't exist, try to create it
+        // If profile doesn't exist, try to create it from user metadata
         if (error.code === 'PGRST116') {
-          console.log('Profile not found, creating new profile');
-          const supabaseUser = (await supabase.auth.getUser()).data.user;
+          console.log('Profile not found, attempting to create from user metadata');
+          const { data: { user: supabaseUser } } = await supabase.auth.getUser();
           if (supabaseUser) {
-            return await createProfileIfMissing(supabaseUser, userData);
+            return await createProfileFromMetadata(supabaseUser);
           }
         }
         return null;
@@ -93,6 +99,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
       return null;
+    }
+  };
+
+  // Set user from profile data
+  const setUserFromProfile = (profile: any) => {
+    if (profile) {
+      setUser({
+        id: profile.id,
+        email: profile.email,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        role: profile.role,
+        tenant_id: profile.tenant_id,
+        avatar_url: profile.avatar_url
+      });
+    } else {
+      setUser(null);
     }
   };
 
@@ -107,20 +130,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         
         if (session?.user) {
-          // Fetch the user profile when logged in
+          console.log('User logged in, fetching profile...');
           const profile = await fetchUserProfile(session.user.id);
-          if (profile) {
-            setUser({
-              id: profile.id,
-              email: profile.email,
-              first_name: profile.first_name,
-              last_name: profile.last_name,
-              role: profile.role,
-              tenant_id: profile.tenant_id,
-              avatar_url: profile.avatar_url
-            });
-          }
+          setUserFromProfile(profile);
         } else {
+          console.log('User logged out');
           setUser(null);
         }
         
@@ -135,17 +149,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (session?.user) {
         fetchUserProfile(session.user.id).then(profile => {
-          if (profile) {
-            setUser({
-              id: profile.id,
-              email: profile.email,
-              first_name: profile.first_name,
-              last_name: profile.last_name,
-              role: profile.role,
-              tenant_id: profile.tenant_id,
-              avatar_url: profile.avatar_url
-            });
-          }
+          setUserFromProfile(profile);
           setIsLoading(false);
         });
       } else {
@@ -178,19 +182,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       // If user is immediately confirmed, fetch/create profile
       if (data.user && data.session) {
-        console.log('User confirmed immediately, fetching profile');
-        const profile = await fetchUserProfile(data.user.id, userData);
-        if (profile) {
-          setUser({
-            id: profile.id,
-            email: profile.email,
-            first_name: profile.first_name,
-            last_name: profile.last_name,
-            role: profile.role,
-            tenant_id: profile.tenant_id,
-            avatar_url: profile.avatar_url
-          });
-        }
+        console.log('User confirmed immediately, fetching/creating profile');
+        const profile = await fetchUserProfile(data.user.id);
+        setUserFromProfile(profile);
       }
     } catch (error) {
       console.error('Signup error:', error);
