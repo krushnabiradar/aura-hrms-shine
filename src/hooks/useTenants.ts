@@ -69,18 +69,54 @@ export const useTenants = () => {
   const createTenantMutation = useMutation({
     mutationFn: async (tenantData: TenantInsert) => {
       console.log('Creating new tenant:', tenantData);
+      
+      // Log the attempt
+      await supabase.rpc('log_system_action', {
+        p_action: 'create_tenant_attempt',
+        p_resource_type: 'tenants',
+        p_details: { tenant_name: tenantData.name }
+      });
+      
+      // Ensure all required fields are present with proper defaults
+      const insertData: TenantInsert = {
+        name: tenantData.name,
+        domain: tenantData.domain || null,
+        plan: tenantData.plan || 'trial',
+        status: tenantData.status || 'active',
+        mrr: tenantData.mrr || 0
+      };
+      
       const { data, error } = await supabase
         .from('tenants')
-        .insert(tenantData)
+        .insert(insertData)
         .select()
         .single();
 
       if (error) {
         console.error('Error creating tenant:', error);
+        // Log the failure
+        await supabase.rpc('log_system_action', {
+          p_action: 'create_tenant_failed',
+          p_resource_type: 'tenants',
+          p_details: { 
+            tenant_name: tenantData.name, 
+            error: error.message 
+          },
+          p_severity: 'error'
+        });
         throw error;
       }
 
       console.log('Tenant created successfully:', data);
+      
+      // Log the success
+      await supabase.rpc('log_system_action', {
+        p_action: 'tenant_created',
+        p_resource_type: 'tenant',
+        p_resource_id: data.id,
+        p_details: { tenant_name: data.name }
+      });
+      
       return data as Tenant;
     },
     onSuccess: () => {

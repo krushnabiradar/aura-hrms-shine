@@ -53,10 +53,11 @@ const TenantManagementPage = () => {
 
     try {
       await createTenant({
-        name: newTenantName,
-        domain: newTenantDomain || null,
+        name: newTenantName.trim(),
+        domain: newTenantDomain.trim() || null,
         plan: 'trial',
-        status: 'active'
+        status: 'active',
+        mrr: 0
       });
       
       toast.success("Tenant created successfully");
@@ -64,6 +65,7 @@ const TenantManagementPage = () => {
       setNewTenantName("");
       setNewTenantDomain("");
     } catch (error: any) {
+      console.error('Tenant creation error:', error);
       toast.error(error.message || "Failed to create tenant");
     }
   };
@@ -99,6 +101,10 @@ const TenantManagementPage = () => {
         return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
       case "business":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+      case "professional":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+      case "starter":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
       case "trial":
         return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
       default:
@@ -131,12 +137,13 @@ const TenantManagementPage = () => {
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Organization Name</Label>
+                <Label htmlFor="name">Organization Name *</Label>
                 <Input 
                   id="name" 
                   placeholder="Acme Corporation"
                   value={newTenantName}
                   onChange={(e) => setNewTenantName(e.target.value)}
+                  required
                 />
               </div>
               <div className="space-y-2">
@@ -150,7 +157,7 @@ const TenantManagementPage = () => {
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateTenant} disabled={isCreatingTenant}>
+                <Button onClick={handleCreateTenant} disabled={isCreatingTenant || !newTenantName.trim()}>
                   {isCreatingTenant ? "Creating..." : "Create Tenant"}
                 </Button>
               </div>
@@ -320,12 +327,13 @@ const TenantManagementPage = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Organization Name</Label>
+              <Label htmlFor="name">Organization Name *</Label>
               <Input 
                 id="name" 
                 placeholder="Acme Corporation"
                 value={newTenantName}
                 onChange={(e) => setNewTenantName(e.target.value)}
+                required
               />
             </div>
             <div className="space-y-2">
@@ -339,7 +347,7 @@ const TenantManagementPage = () => {
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateTenant} disabled={isCreatingTenant}>
+              <Button onClick={handleCreateTenant} disabled={isCreatingTenant || !newTenantName.trim()}>
                 {isCreatingTenant ? "Creating..." : "Create Tenant"}
               </Button>
             </div>
