@@ -12,7 +12,7 @@ export const useAttendance = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Query to fetch attendance records
+  // Query to fetch attendance records based on user role
   const {
     data: attendanceRecords,
     isLoading: isLoadingAttendance,
@@ -47,12 +47,30 @@ export const useAttendance = () => {
     queryFn: async () => {
       if (!user?.id) return null;
       
+      // Get current user's employee record first
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (employeeError) {
+        console.error('Error fetching employee data:', employeeError);
+        return null;
+      }
+
+      if (!employeeData) {
+        console.log('No employee record found for user');
+        return null;
+      }
+
       const today = new Date().toISOString().split('T')[0];
-      console.log('Fetching today\'s attendance for:', user.id, 'date:', today);
+      console.log('Fetching today\'s attendance for employee:', employeeData.id, 'date:', today);
       
       const { data, error } = await supabase
         .from('attendance')
         .select('*')
+        .eq('employee_id', employeeData.id)
         .eq('date', today)
         .maybeSingle();
 
@@ -69,11 +87,28 @@ export const useAttendance = () => {
 
   // Mutation to create attendance record
   const createAttendanceMutation = useMutation({
-    mutationFn: async (attendanceData: AttendanceInsert) => {
+    mutationFn: async (attendanceData: Omit<AttendanceInsert, 'employee_id' | 'tenant_id'>) => {
       console.log('Creating attendance record:', attendanceData);
+      
+      // Get current user's employee and tenant info
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('id, tenant_id')
+        .eq('user_id', user!.id)
+        .single();
+
+      if (employeeError) {
+        console.error('Error fetching employee data:', employeeError);
+        throw employeeError;
+      }
+
       const { data, error } = await supabase
         .from('attendance')
-        .insert(attendanceData)
+        .insert({
+          ...attendanceData,
+          employee_id: employeeData.id,
+          tenant_id: employeeData.tenant_id
+        })
         .select()
         .single();
 

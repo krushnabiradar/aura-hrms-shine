@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -30,10 +31,20 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "@/components/ui/sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+// Import hooks for real data
+import { useEmployees } from "@/hooks/useEmployees";
+import { useLeaveRequests } from "@/hooks/useLeaveRequests";
+import { useAttendance } from "@/hooks/useAttendance";
+
 const EmployeeDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const location = useLocation();
+  
+  // Use real data hooks
+  const { currentEmployee, isLoadingCurrentEmployee } = useEmployees();
+  const { myLeaveRequests, isLoadingMyLeaveRequests } = useLeaveRequests();
+  const { todaysAttendance, isLoadingTodaysAttendance, attendanceRecords } = useAttendance();
   
   // Simulating data loading
   useEffect(() => {
@@ -78,6 +89,23 @@ const EmployeeDashboard = () => {
     return 'User';
   };
 
+  // Calculate statistics from real data
+  const totalLeaveRequests = myLeaveRequests?.length || 0;
+  const approvedLeaveRequests = myLeaveRequests?.filter(lr => lr.status === 'approved').length || 0;
+  const pendingLeaveRequests = myLeaveRequests?.filter(lr => lr.status === 'pending').length || 0;
+  
+  // Calculate total working hours this week
+  const currentWeekAttendance = attendanceRecords?.filter(ar => {
+    const recordDate = new Date(ar.date);
+    const currentDate = new Date();
+    const weekStart = new Date(currentDate.setDate(currentDate.getDate() - currentDate.getDay()));
+    return recordDate >= weekStart;
+  }) || [];
+  
+  const totalHoursThisWeek = currentWeekAttendance.reduce((total, record) => {
+    return total + (record.total_hours ? Number(record.total_hours) : 0);
+  }, 0);
+
   const renderDashboardHome = () => (
     <div className="space-y-8">
       <div>
@@ -87,28 +115,28 @@ const EmployeeDashboard = () => {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <DashboardCard
-          title="Available Leave"
-          value={isLoading ? "Loading..." : "12 days"}
+          title="Leave Requests"
+          value={isLoadingMyLeaveRequests ? "Loading..." : `${totalLeaveRequests} total`}
           icon={Calendar}
-          description="Annual leave balance"
+          description={`${pendingLeaveRequests} pending`}
         />
         <DashboardCard
           title="Working Hours"
-          value={isLoading ? "Loading..." : "32h / 40h"}
+          value={isLoading ? "Loading..." : `${totalHoursThisWeek.toFixed(1)}h / 40h`}
           icon={Clock}
           description="This week"
         />
         <DashboardCard
-          title="Pending Tasks"
-          value={isLoading ? "Loading..." : "5"}
+          title="Today's Status"
+          value={isLoadingTodaysAttendance ? "Loading..." : todaysAttendance ? "Checked In" : "Not Checked In"}
           icon={FileText}
-          description="Due this week"
+          description="Attendance status"
         />
         <DashboardCard
-          title="Team Members"
-          value={isLoading ? "Loading..." : "8"}
+          title="Employee ID"
+          value={isLoadingCurrentEmployee ? "Loading..." : currentEmployee?.employee_id || "N/A"}
           icon={Users}
-          description="In your department"
+          description="Your employee ID"
         />
       </div>
 
@@ -158,41 +186,32 @@ const EmployeeDashboard = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Upcoming Schedule</CardTitle>
-            <CardDescription>Your calendar for the next few days</CardDescription>
+            <CardTitle>My Leave Requests</CardTitle>
+            <CardDescription>Your recent leave applications</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="text-center py-4">Loading schedule...</div>
-            ) : (
+            {isLoadingMyLeaveRequests ? (
+              <div className="text-center py-4">Loading leave requests...</div>
+            ) : myLeaveRequests && myLeaveRequests.length > 0 ? (
               <div className="space-y-4">
-                <div className="flex items-center gap-3 p-3 border rounded-md">
-                  <div className="bg-primary/10 p-2 rounded">
-                    <Calendar className="h-5 w-5 text-primary" />
+                {myLeaveRequests.slice(0, 3).map((request) => (
+                  <div key={request.id} className="flex items-center gap-3 p-3 border rounded-md">
+                    <div className="bg-primary/10 p-2 rounded">
+                      <Calendar className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium">{request.leave_type}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(request.start_date).toLocaleDateString()} - {new Date(request.end_date).toLocaleDateString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Status: {request.status}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-medium">Team Standup</h4>
-                    <p className="text-sm text-muted-foreground">Today • 9:30 AM</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 border rounded-md">
-                  <div className="bg-primary/10 p-2 rounded">
-                    <Users className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Project Review</h4>
-                    <p className="text-sm text-muted-foreground">Today • 2:00 PM</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 border rounded-md">
-                  <div className="bg-primary/10 p-2 rounded">
-                    <FileText className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Performance Review</h4>
-                    <p className="text-sm text-muted-foreground">Tomorrow • 11:00 AM</p>
-                  </div>
-                </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No leave requests found
               </div>
             )}
           </CardContent>
@@ -204,22 +223,18 @@ const EmployeeDashboard = () => {
             <CardDescription>Company updates and news</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="text-center py-4">Loading announcements...</div>
-            ) : (
-              <div className="space-y-4">
-                <div className="p-3 border rounded-md">
-                  <h4 className="font-medium">New Benefits Package</h4>
-                  <p className="text-sm text-muted-foreground">HR has announced updates to the company benefits package starting next month.</p>
-                  <p className="text-xs text-muted-foreground mt-2">Posted: May 15, 2023</p>
-                </div>
-                <div className="p-3 border rounded-md">
-                  <h4 className="font-medium">Office Closure Notice</h4>
-                  <p className="text-sm text-muted-foreground">The office will be closed for maintenance on May 27th.</p>
-                  <p className="text-xs text-muted-foreground mt-2">Posted: May 12, 2023</p>
-                </div>
+            <div className="space-y-4">
+              <div className="p-3 border rounded-md">
+                <h4 className="font-medium">New Benefits Package</h4>
+                <p className="text-sm text-muted-foreground">HR has announced updates to the company benefits package starting next month.</p>
+                <p className="text-xs text-muted-foreground mt-2">Posted: May 15, 2023</p>
               </div>
-            )}
+              <div className="p-3 border rounded-md">
+                <h4 className="font-medium">Office Closure Notice</h4>
+                <p className="text-sm text-muted-foreground">The office will be closed for maintenance on May 27th.</p>
+                <p className="text-xs text-muted-foreground mt-2">Posted: May 12, 2023</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -227,69 +242,48 @@ const EmployeeDashboard = () => {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Your Team</CardTitle>
-            <CardDescription>People you work with</CardDescription>
+            <CardTitle>Attendance Summary</CardTitle>
+            <CardDescription>Your attendance records</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="text-center py-4">Loading team data...</div>
+            {isLoadingTodaysAttendance ? (
+              <div className="text-center py-4">Loading attendance data...</div>
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" />
-                      <AvatarFallback>SJ</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h4 className="font-medium">Sarah Johnson</h4>
-                      <p className="text-sm text-muted-foreground">Team Lead</p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => toast.info("Messaging feature not implemented")}>
-                    <MessageSquare className="h-4 w-4" />
-                  </Button>
+                  <span className="text-sm font-medium">Today's Status</span>
+                  <span className={`text-sm font-medium ${todaysAttendance ? 'text-green-600' : 'text-red-600'}`}>
+                    {todaysAttendance ? 'Present' : 'Absent'}
+                  </span>
                 </div>
-                
-                <div className="flex items-center justify-between">
+                {todaysAttendance && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Check In</span>
+                      <span className="text-sm">
+                        {todaysAttendance.check_in ? new Date(todaysAttendance.check_in).toLocaleTimeString() : 'Not checked in'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Check Out</span>
+                      <span className="text-sm">
+                        {todaysAttendance.check_out ? new Date(todaysAttendance.check_out).toLocaleTimeString() : 'Not checked out'}
+                      </span>
+                    </div>
+                  </>
+                )}
+                <div className="pt-4">
                   <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=Michael" />
-                      <AvatarFallback>MR</AvatarFallback>
-                    </Avatar>
+                    <Clock className="h-5 w-5 text-accent" />
                     <div>
-                      <h4 className="font-medium">Michael Rodriguez</h4>
-                      <p className="text-sm text-muted-foreground">Senior Developer</p>
+                      <h4 className="font-medium">This Week</h4>
+                      <p className="text-sm text-muted-foreground">{totalHoursThisWeek.toFixed(1)} hours worked</p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => toast.info("Messaging feature not implemented")}>
-                    <MessageSquare className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=Emily" />
-                      <AvatarFallback>EW</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h4 className="font-medium">Emily Wong</h4>
-                      <p className="text-sm text-muted-foreground">UX Designer</p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => toast.info("Messaging feature not implemented")}>
-                    <MessageSquare className="h-4 w-4" />
-                  </Button>
                 </div>
               </div>
             )}
           </CardContent>
-          <CardFooter>
-            <Button variant="outline" className="w-full" onClick={() => toast.info("Team directory not implemented")}>
-              View Full Team
-            </Button>
-          </CardFooter>
         </Card>
 
         <Card>
@@ -298,53 +292,49 @@ const EmployeeDashboard = () => {
             <CardDescription>Progress toward your targets</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="text-center py-4">Loading performance data...</div>
-            ) : (
-              <div className="space-y-5">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm font-medium">Q2 Objectives</span>
-                    <span className="text-sm font-medium">75%</span>
+            <div className="space-y-5">
+              <div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium">Q2 Objectives</span>
+                  <span className="text-sm font-medium">75%</span>
+                </div>
+                <Progress value={75} className="h-2" />
+              </div>
+              
+              <div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium">Project Alpha Completion</span>
+                  <span className="text-sm font-medium">60%</span>
+                </div>
+                <Progress value={60} className="h-2" />
+              </div>
+              
+              <div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium">Learning & Development</span>
+                  <span className="text-sm font-medium">30%</span>
+                </div>
+                <Progress value={30} className="h-2" />
+              </div>
+              
+              <div className="pt-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <Award className="h-5 w-5 text-accent" />
+                  <div>
+                    <h4 className="font-medium">Recent Achievement</h4>
+                    <p className="text-sm text-muted-foreground">Completed Advanced Training</p>
                   </div>
-                  <Progress value={75} className="h-2" />
                 </div>
                 
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm font-medium">Project Alpha Completion</span>
-                    <span className="text-sm font-medium">60%</span>
-                  </div>
-                  <Progress value={60} className="h-2" />
-                </div>
-                
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm font-medium">Learning & Development</span>
-                    <span className="text-sm font-medium">30%</span>
-                  </div>
-                  <Progress value={30} className="h-2" />
-                </div>
-                
-                <div className="pt-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Award className="h-5 w-5 text-accent" />
-                    <div>
-                      <h4 className="font-medium">Recent Achievement</h4>
-                      <p className="text-sm text-muted-foreground">Completed Advanced Training</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <Briefcase className="h-5 w-5 text-accent" />
-                    <div>
-                      <h4 className="font-medium">Next Review</h4>
-                      <p className="text-sm text-muted-foreground">Scheduled for June 15, 2023</p>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <Briefcase className="h-5 w-5 text-accent" />
+                  <div>
+                    <h4 className="font-medium">Next Review</h4>
+                    <p className="text-sm text-muted-foreground">Scheduled for June 15, 2023</p>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -12,7 +12,7 @@ export const useLeaveRequests = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Query to fetch leave requests
+  // Query to fetch leave requests based on user role
   const {
     data: leaveRequests,
     isLoading: isLoadingLeaveRequests,
@@ -34,7 +34,7 @@ export const useLeaveRequests = () => {
       console.log('Leave requests fetched successfully:', data);
       return data as LeaveRequest[];
     },
-    enabled: !!user
+    enabled: !!user && (user.role === 'system_admin' || user.role === 'tenant_admin')
   });
 
   // Query to fetch current user's leave requests
@@ -48,9 +48,28 @@ export const useLeaveRequests = () => {
       if (!user?.id) return [];
       
       console.log('Fetching my leave requests...');
+      
+      // For employees, we need to get their employee record first
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (employeeError) {
+        console.error('Error fetching employee data:', employeeError);
+        return [];
+      }
+
+      if (!employeeData) {
+        console.log('No employee record found for user');
+        return [];
+      }
+
       const { data, error } = await supabase
         .from('leave_requests')
         .select('*')
+        .eq('employee_id', employeeData.id)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -66,11 +85,28 @@ export const useLeaveRequests = () => {
 
   // Mutation to create leave request
   const createLeaveRequestMutation = useMutation({
-    mutationFn: async (leaveRequestData: LeaveRequestInsert) => {
+    mutationFn: async (leaveRequestData: Omit<LeaveRequestInsert, 'employee_id' | 'tenant_id'>) => {
       console.log('Creating leave request:', leaveRequestData);
+      
+      // Get current user's employee and tenant info
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('id, tenant_id')
+        .eq('user_id', user!.id)
+        .single();
+
+      if (employeeError) {
+        console.error('Error fetching employee data:', employeeError);
+        throw employeeError;
+      }
+
       const { data, error } = await supabase
         .from('leave_requests')
-        .insert(leaveRequestData)
+        .insert({
+          ...leaveRequestData,
+          employee_id: employeeData.id,
+          tenant_id: employeeData.tenant_id
+        })
         .select()
         .single();
 

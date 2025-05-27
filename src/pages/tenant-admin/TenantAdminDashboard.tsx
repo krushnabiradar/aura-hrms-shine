@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
@@ -26,51 +27,22 @@ import AttendanceManagementPage from "./AttendanceManagementPage";
 import LeaveAdministrationPage from "./LeaveAdministrationPage";
 import PayrollProcessingPage from "./PayrollProcessingPage";
 
-// Mock data
-const recentEmployees = [
-  { 
-    id: "emp1", 
-    name: "Alice Johnson", 
-    position: "Software Developer", 
-    department: "Engineering",
-    joinDate: "2023-05-01", 
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alice" 
-  },
-  { 
-    id: "emp2", 
-    name: "Bob Smith", 
-    position: "UX Designer", 
-    department: "Design",
-    joinDate: "2023-05-03", 
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Bob" 
-  },
-  { 
-    id: "emp3", 
-    name: "Carol White", 
-    position: "Project Manager", 
-    department: "Management",
-    joinDate: "2023-05-05", 
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Carol" 
-  },
-  { 
-    id: "emp4", 
-    name: "Dave Miller", 
-    position: "Marketing Specialist", 
-    department: "Marketing",
-    joinDate: "2023-05-10", 
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Dave" 
-  },
-];
-
-const pendingRequests = [
-  { id: 1, type: "Leave Request", employee: "Alice Johnson", submitted: "2023-05-12", status: "Pending" },
-  { id: 2, type: "Expense Claim", employee: "Bob Smith", submitted: "2023-05-11", status: "Pending" },
-  { id: 3, type: "Leave Request", employee: "Carol White", submitted: "2023-05-10", status: "Pending" },
-];
+// Import hooks for real data
+import { useEmployees } from "@/hooks/useEmployees";
+import { useLeaveRequests } from "@/hooks/useLeaveRequests";
+import { useAttendance } from "@/hooks/useAttendance";
+import { useInvitations } from "@/hooks/useInvitations";
+import { InvitationManager } from "@/components/invitations/InvitationManager";
 
 const TenantAdminDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { pathname } = useLocation();
+  
+  // Use real data hooks
+  const { employees, isLoadingEmployees } = useEmployees();
+  const { leaveRequests, isLoadingLeaveRequests } = useLeaveRequests();
+  const { attendanceRecords, isLoadingAttendance } = useAttendance();
+  const { invitations, isLoadingInvitations } = useInvitations();
   
   // Simulating data loading
   useEffect(() => {
@@ -84,6 +56,20 @@ const TenantAdminDashboard = () => {
   const handleAddEmployee = () => {
     toast.info("Add employee functionality not implemented yet");
   };
+
+  // Calculate statistics from real data
+  const totalEmployees = employees?.length || 0;
+  const pendingLeaveRequests = leaveRequests?.filter(lr => lr.status === 'pending').length || 0;
+  const todayAttendance = attendanceRecords?.filter(ar => 
+    new Date(ar.date).toDateString() === new Date().toDateString()
+  ).length || 0;
+  const pendingInvitations = invitations?.filter(i => !i.accepted_at).length || 0;
+
+  // Get recent employees (last 5)
+  const recentEmployees = employees?.slice(-5) || [];
+  
+  // Get pending requests for approval
+  const pendingRequests = leaveRequests?.filter(lr => lr.status === 'pending').slice(0, 3) || [];
 
   // Route to appropriate page based on pathname
   const renderPage = () => {
@@ -118,30 +104,29 @@ const TenantAdminDashboard = () => {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <DashboardCard
                 title="Total Employees"
-                value={isLoading ? "Loading..." : "126"}
+                value={isLoadingEmployees ? "Loading..." : totalEmployees.toString()}
                 icon={Users}
                 trend={3.2}
                 trendLabel="from last month"
               />
               <DashboardCard
                 title="Leave Requests"
-                value={isLoading ? "Loading..." : "8"}
+                value={isLoadingLeaveRequests ? "Loading..." : pendingLeaveRequests.toString()}
                 icon={Calendar}
                 trend={-2.5}
-                trendLabel="from last month"
+                trendLabel="pending approval"
               />
               <DashboardCard
-                title="Payroll Status"
-                value={isLoading ? "Loading..." : "Processed"}
-                icon={DollarSign}
-                description="Next run: May 30, 2023"
+                title="Today's Attendance"
+                value={isLoadingAttendance ? "Loading..." : `${todayAttendance}/${totalEmployees}`}
+                icon={UserCheck}
+                description="Present today"
               />
               <DashboardCard
-                title="Open Positions"
-                value={isLoading ? "Loading..." : "5"}
+                title="Pending Invitations"
+                value={isLoadingInvitations ? "Loading..." : pendingInvitations.toString()}
                 icon={Briefcase}
-                trend={25}
-                trendLabel="from last month"
+                description="Awaiting acceptance"
               />
             </div>
 
@@ -151,7 +136,7 @@ const TenantAdminDashboard = () => {
                   <div>
                     <CardTitle>Recently Added Employees</CardTitle>
                     <CardDescription>
-                      New employees added in the last 30 days.
+                      New employees in your organization.
                     </CardDescription>
                   </div>
                   <Button onClick={handleAddEmployee}>Add Employee</Button>
@@ -160,36 +145,41 @@ const TenantAdminDashboard = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Employee</TableHead>
+                        <TableHead>Employee ID</TableHead>
                         <TableHead>Position</TableHead>
                         <TableHead>Department</TableHead>
-                        <TableHead>Join Date</TableHead>
+                        <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {isLoading ? (
+                      {isLoadingEmployees ? (
                         <TableRow>
                           <TableCell colSpan={4} className="text-center">
                             Loading employee data...
                           </TableCell>
                         </TableRow>
-                      ) : (
+                      ) : recentEmployees.length > 0 ? (
                         recentEmployees.map((employee) => (
                           <TableRow key={employee.id}>
+                            <TableCell className="font-medium">{employee.employee_id}</TableCell>
+                            <TableCell>{employee.position || 'Not specified'}</TableCell>
+                            <TableCell>{employee.department || 'Not specified'}</TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={employee.avatar} alt={employee.name} />
-                                  <AvatarFallback>{employee.name.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div className="font-medium">{employee.name}</div>
-                              </div>
+                              <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                                employee.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                              }`}>
+                                {employee.status}
+                              </span>
                             </TableCell>
-                            <TableCell>{employee.position}</TableCell>
-                            <TableCell>{employee.department}</TableCell>
-                            <TableCell>{employee.joinDate}</TableCell>
                           </TableRow>
                         ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground">
+                            No employees found
+                          </TableCell>
+                        </TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -204,21 +194,23 @@ const TenantAdminDashboard = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {isLoading ? (
+                  {isLoadingLeaveRequests ? (
                     <div className="text-center py-4">Loading requests...</div>
                   ) : pendingRequests.length > 0 ? (
                     <div className="space-y-4">
                       {pendingRequests.map((request) => (
                         <div key={request.id} className="flex items-start justify-between p-3 border rounded-md">
                           <div>
-                            <h4 className="font-medium">{request.type}</h4>
-                            <p className="text-sm text-muted-foreground">By {request.employee}</p>
-                            <p className="text-xs text-muted-foreground">Submitted on {request.submitted}</p>
+                            <h4 className="font-medium">{request.leave_type} Request</h4>
+                            <p className="text-sm text-muted-foreground">{request.days_requested} days</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(request.start_date).toLocaleDateString()} - {new Date(request.end_date).toLocaleDateString()}
+                            </p>
                           </div>
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => toast.info(`Viewing ${request.type} from ${request.employee}`)}
+                            onClick={() => toast.info(`Viewing leave request`)}
                           >
                             Review
                           </Button>
@@ -244,51 +236,14 @@ const TenantAdminDashboard = () => {
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
                     <UserCheck className="h-16 w-16" />
                     <p>Attendance chart will appear here</p>
+                    {!isLoadingAttendance && (
+                      <p className="text-sm">Total records: {attendanceRecords?.length || 0}</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upcoming Events</CardTitle>
-                  <CardDescription>Scheduled company events</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="text-center py-4">Loading events...</div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-start gap-3 p-3 border rounded-md">
-                        <div className="bg-primary/10 p-2 rounded">
-                          <Calendar className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium">Company Town Hall</h4>
-                          <p className="text-sm text-muted-foreground">May 25, 2023 • 3:00 PM</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3 p-3 border rounded-md">
-                        <div className="bg-primary/10 p-2 rounded">
-                          <Clock className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium">Quarterly Review</h4>
-                          <p className="text-sm text-muted-foreground">May 28, 2023 • 10:00 AM</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3 p-3 border rounded-md">
-                        <div className="bg-primary/10 p-2 rounded">
-                          <FileText className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium">Performance Reviews Due</h4>
-                          <p className="text-sm text-muted-foreground">May 30, 2023</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <InvitationManager />
             </div>
           </div>
         );
