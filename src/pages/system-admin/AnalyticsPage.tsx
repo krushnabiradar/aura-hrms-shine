@@ -17,7 +17,7 @@ const AnalyticsPage = () => {
   const [dateRange, setDateRange] = useState({ from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), to: new Date() });
   const [selectedTenant, setSelectedTenant] = useState("all");
   
-  const { analytics, isLoadingAnalytics } = useAnalytics();
+  const { systemAnalytics, isLoadingAnalytics } = useAnalytics();
   const { tenants } = useTenants();
   const { profiles } = useProfiles();
   const { subscriptions } = useSubscriptions();

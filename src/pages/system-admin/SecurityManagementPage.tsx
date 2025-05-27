@@ -34,7 +34,7 @@ const SecurityManagementPage = () => {
   };
 
   const handleSettingToggle = (settingId: string, currentValue: any) => {
-    const newValue = currentValue === 'true' ? 'false' : 'true';
+    const newValue = String(currentValue) === 'true' ? 'false' : 'true';
     updateSetting({ 
       id: settingId, 
       updates: { 
@@ -47,8 +47,8 @@ const SecurityManagementPage = () => {
 
   const getSecurityLevel = () => {
     const twoFactorEnabled = settings?.find(s => s.setting_key === 'two_factor_required')?.setting_value === 'true';
-    const sessionTimeout = parseInt(settings?.find(s => s.setting_key === 'session_timeout')?.setting_value || '3600');
-    const minPasswordLength = parseInt(settings?.find(s => s.setting_key === 'password_min_length')?.setting_value || '8');
+    const sessionTimeout = parseInt(String(settings?.find(s => s.setting_key === 'session_timeout')?.setting_value || '3600'));
+    const minPasswordLength = parseInt(String(settings?.find(s => s.setting_key === 'password_min_length')?.setting_value || '8'));
     
     let score = 0;
     if (twoFactorEnabled) score += 3;
@@ -155,7 +155,7 @@ const SecurityManagementPage = () => {
                       <Badge variant="outline">{setting.category}</Badge>
                       {setting.setting_key.includes('required') || setting.setting_key.includes('enable') ? (
                         <Switch
-                          checked={setting.setting_value === 'true'}
+                          checked={String(setting.setting_value) === 'true'}
                           onCheckedChange={() => handleSettingToggle(setting.id, setting.setting_value)}
                         />
                       ) : (
@@ -286,7 +286,7 @@ const SecurityManagementPage = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-xs truncate">
-                        {JSON.stringify(log.details)}
+                        {String(log.details)}
                       </TableCell>
                     </TableRow>
                   ))}
