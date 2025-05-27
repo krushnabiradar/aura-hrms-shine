@@ -37,7 +37,7 @@ export const useSessionManagement = () => {
         .from('security_settings')
         .select('setting_value')
         .eq('setting_key', 'session_concurrent_limit')
-        .single();
+        .maybeSingle();
         
       const limit = limitSetting ? parseInt(String(limitSetting.setting_value)) : 3;
 
@@ -73,12 +73,25 @@ export const useSessionManagement = () => {
     }) => {
       console.log('Creating user session...');
       
+      // Check if session already exists
+      const { data: existingSession } = await supabase
+        .from('user_sessions')
+        .select('id')
+        .eq('session_token', sessionToken)
+        .eq('is_active', true)
+        .maybeSingle();
+        
+      if (existingSession) {
+        console.log('Session already exists, skipping creation');
+        return existingSession;
+      }
+      
       // Get concurrent session limit
       const { data: limitSetting } = await supabase
         .from('security_settings')
         .select('setting_value')
         .eq('setting_key', 'session_concurrent_limit')
-        .single();
+        .maybeSingle();
         
       const limit = limitSetting ? parseInt(String(limitSetting.setting_value)) : 3;
       

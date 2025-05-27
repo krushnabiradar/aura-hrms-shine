@@ -23,7 +23,7 @@ export const useSecurityPolicies = () => {
         .from('security_settings')
         .select('setting_value')
         .eq('setting_key', 'session_timeout')
-        .single();
+        .maybeSingle();
         
       if (timeoutSetting) {
         const timeoutSeconds = parseInt(String(timeoutSetting.setting_value));
@@ -45,7 +45,7 @@ export const useSecurityPolicies = () => {
         .from('security_settings')
         .select('setting_value')
         .eq('setting_key', 'session_concurrent_limit')
-        .single();
+        .maybeSingle();
         
       if (limitSetting) {
         const limit = parseInt(String(limitSetting.setting_value));
@@ -88,10 +88,27 @@ export const useSecurityPolicies = () => {
         .from('security_settings')
         .select('setting_value')
         .eq('setting_key', 'session_timeout')
-        .single();
+        .maybeSingle();
         
       if (!timeoutSetting) {
-        throw new Error('Session timeout setting not found');
+        console.log('No session timeout setting found, using default 1 hour');
+        const defaultTimeout = 3600; // 1 hour
+        const cutoffTime = new Date(Date.now() - defaultTimeout * 1000).toISOString();
+        
+        const { data, error } = await supabase
+          .from('user_sessions')
+          .update({ is_active: false })
+          .eq('is_active', true)
+          .lt('last_activity', cutoffTime)
+          .select();
+          
+        if (error) {
+          console.error('Error cleaning up sessions:', error);
+          throw error;
+        }
+        
+        console.log('Sessions cleaned up:', data?.length || 0);
+        return data?.length || 0;
       }
       
       const timeoutSeconds = parseInt(String(timeoutSetting.setting_value));
