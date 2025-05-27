@@ -13,6 +13,7 @@ import { toast } from "@/components/ui/sonner";
 import { useSecuritySettings } from "@/hooks/useSecuritySettings";
 import { useUserSessions } from "@/hooks/useUserSessions";
 import { useSystemLogs } from "@/hooks/useSystemLogs";
+import { SecurityPolicyMonitor } from "@/components/security/SecurityPolicyMonitor";
 
 const SecurityManagementPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -109,6 +110,9 @@ const SecurityManagementPage = () => {
           Export Report
         </Button>
       </div>
+
+      {/* Add Security Policy Monitor */}
+      <SecurityPolicyMonitor />
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>

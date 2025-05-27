@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
@@ -140,6 +139,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Enhanced session management with automatic session tracking
+  const createUserSession = async (session: Session) => {
+    if (!session?.user) return;
+
+    try {
+      const userAgent = navigator.userAgent;
+      const sessionToken = session.access_token;
+      const expiresAt = new Date(session.expires_at! * 1000).toISOString();
+      
+      // Get IP address (simplified for demo)
+      const ipAddress = '127.0.0.1'; // In production, get from server
+
+      const { error } = await supabase.rpc('create_user_session', {
+        p_session_token: sessionToken,
+        p_expires_at: expiresAt,
+        p_ip_address: ipAddress,
+        p_user_agent: userAgent
+      });
+
+      if (error) {
+        console.error('Error creating user session:', error);
+      } else {
+        console.log('User session created successfully');
+      }
+    } catch (error) {
+      console.error('Error in createUserSession:', error);
+    }
+  };
+
   // Set up auth state listener
   useEffect(() => {
     console.log('Setting up auth state listener');
@@ -166,6 +194,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               const profile = await fetchUserProfile(initialSession.user.id);
               if (isMounted) {
                 setUserFromProfile(profile);
+                // Track existing session
+                await createUserSession(initialSession);
               }
             } else {
               console.log('No initial session found');
@@ -205,6 +235,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const profile = await fetchUserProfile(session.user.id);
             if (isMounted) {
               setUserFromProfile(profile);
+              // Create session tracking for new logins
+              if (event === 'SIGNED_IN') {
+                await createUserSession(session);
+              }
             }
           } else {
             console.log('User logged out via state change');
@@ -282,6 +316,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
 
       console.log('Login successful:', data);
+      // Session tracking will be handled by the auth state listener
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -292,6 +327,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try {
+      // Cleanup current session before logging out
+      if (session) {
+        const { error: sessionError } = await supabase
+          .from('user_sessions')
+          .update({ is_active: false })
+          .eq('session_token', session.access_token);
+          
+        if (sessionError) {
+          console.error('Error deactivating session:', sessionError);
+        }
+      }
+
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     } catch (error) {
