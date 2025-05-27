@@ -335,6 +335,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_user_employee_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_user_role: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["user_role"]
@@ -342,6 +346,18 @@ export type Database = {
       get_user_tenant: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_user_tenant_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      is_system_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_tenant_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
     }
     Enums: {

@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth, UserRole } from '@/context/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useTenants } from '@/hooks/useTenants';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -17,15 +17,24 @@ const Auth = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [role, setRole] = useState<UserRole>('employee');
+  const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   
   const { login, signup, isLoading } = useAuth();
+  const { tenants, isLoadingTenants } = useTenants();
   const navigate = useNavigate();
   const location = useLocation();
   
   const from = location.state?.from?.pathname || '/';
+
+  // Load tenants for signup form
+  useEffect(() => {
+    if (tenants && tenants.length > 0 && !selectedTenantId) {
+      setSelectedTenantId(tenants[0].id);
+    }
+  }, [tenants, selectedTenantId]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +65,11 @@ const Auth = () => {
       return;
     }
 
+    if (role !== 'system_admin' && !selectedTenantId) {
+      setError('Please select a tenant');
+      return;
+    }
+
     setIsSubmitting(true);
     setError('');
     setSuccessMessage('');
@@ -64,7 +78,8 @@ const Auth = () => {
       await signup(email, password, {
         first_name: firstName,
         last_name: lastName,
-        role: role
+        role: role,
+        tenant_id: role === 'system_admin' ? undefined : selectedTenantId
       });
       
       setError('');
@@ -77,6 +92,7 @@ const Auth = () => {
       setFirstName('');
       setLastName('');
       setRole('employee');
+      setSelectedTenantId(tenants?.[0]?.id || '');
     } catch (err: any) {
       console.error('Signup error:', err);
       setError(err.message || 'Signup failed. Please try again.');
@@ -203,6 +219,28 @@ const Auth = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                
+                {role !== 'system_admin' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="tenant">Organization</Label>
+                    <Select 
+                      value={selectedTenantId} 
+                      onValueChange={setSelectedTenantId}
+                      disabled={isLoadingTenants}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an organization" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tenants?.map((tenant) => (
+                          <SelectItem key={tenant.id} value={tenant.id}>
+                            {tenant.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 
                 <div className="space-y-2">
                   <Label htmlFor="signupEmail">Email</Label>

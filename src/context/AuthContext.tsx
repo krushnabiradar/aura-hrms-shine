@@ -23,7 +23,7 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, userData?: { first_name?: string; last_name?: string; role?: UserRole }) => Promise<void>;
+  signup: (email: string, password: string, userData?: { first_name?: string; last_name?: string; role?: UserRole; tenant_id?: string }) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -46,7 +46,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         email: supabaseUser.email || '',
         first_name: userData.first_name || '',
         last_name: userData.last_name || '',
-        role: (userData.role as UserRole) || 'employee' as UserRole
+        role: (userData.role as UserRole) || 'employee' as UserRole,
+        tenant_id: userData.tenant_id || null
       };
 
       console.log('Profile data to insert:', profileData);
@@ -180,7 +181,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signup = async (email: string, password: string, userData?: { first_name?: string; last_name?: string; role?: UserRole }) => {
+  const signup = async (email: string, password: string, userData?: { first_name?: string; last_name?: string; role?: UserRole; tenant_id?: string }) => {
     setIsLoading(true);
     try {
       console.log('Starting signup process for:', email, 'with role:', userData?.role);
@@ -191,7 +192,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           data: {
             first_name: userData?.first_name || '',
             last_name: userData?.last_name || '',
-            role: userData?.role || 'employee'
+            role: userData?.role || 'employee',
+            tenant_id: userData?.tenant_id || null
           }
         }
       });
