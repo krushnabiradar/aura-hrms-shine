@@ -39,9 +39,33 @@ export const useBillingHistory = () => {
     enabled: !!user && user.role === 'system_admin'
   });
 
+  // Query to fetch billing history for a specific tenant
+  const fetchTenantBilling = (tenantId: string) => {
+    return useQuery({
+      queryKey: ['billing-history', tenantId],
+      queryFn: async () => {
+        console.log('Fetching billing history for tenant:', tenantId);
+        const { data, error } = await supabase
+          .from('billing_history')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .order('billing_date', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching tenant billing history:', error);
+          throw error;
+        }
+
+        return data as BillingHistory[];
+      },
+      enabled: !!tenantId
+    });
+  };
+
   return {
     billingHistory,
     isLoadingBillingHistory,
-    billingHistoryError
+    billingHistoryError,
+    fetchTenantBilling
   };
 };

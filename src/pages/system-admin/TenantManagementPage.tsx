@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Building, Users, DollarSign, TrendingUp, Plus, MoreHorizontal, Search } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +11,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "@/components/ui/sonner";
 import { useTenants } from "@/hooks/useTenants";
 import { useProfiles } from "@/hooks/useProfiles";
+import { TenantActionsDialog } from "@/components/tenant/TenantActionsDialog";
+import type { Database } from '@/integrations/supabase/types';
+
+type Tenant = Database['public']['Tables']['tenants']['Row'];
 
 const TenantManagementPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -19,6 +22,11 @@ const TenantManagementPage = () => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [newTenantName, setNewTenantName] = useState("");
   const [newTenantDomain, setNewTenantDomain] = useState("");
+  
+  // Tenant actions dialog state
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [actionDialogOpen, setActionDialogOpen] = useState(false);
+  const [currentAction, setCurrentAction] = useState<'edit' | 'users' | 'billing' | 'suspend' | null>(null);
 
   // Use real data hooks
   const { tenants, isLoadingTenants, createTenant, isCreatingTenant } = useTenants();
@@ -60,8 +68,16 @@ const TenantManagementPage = () => {
     }
   };
 
-  const handleTenantAction = (action: string, tenantName: string) => {
-    toast.info(`${action} for ${tenantName} executed`);
+  const handleTenantAction = (action: 'edit' | 'users' | 'billing' | 'suspend', tenant: Tenant) => {
+    setSelectedTenant(tenant);
+    setCurrentAction(action);
+    setActionDialogOpen(true);
+  };
+
+  const closeActionDialog = () => {
+    setActionDialogOpen(false);
+    setSelectedTenant(null);
+    setCurrentAction(null);
   };
 
   const getStatusColor = (status: string) => {
@@ -260,17 +276,17 @@ const TenantManagementPage = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleTenantAction("Edit Settings", tenant.name)}>
+                          <DropdownMenuItem onClick={() => handleTenantAction("edit", tenant)}>
                             Edit Settings
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleTenantAction("View Users", tenant.name)}>
+                          <DropdownMenuItem onClick={() => handleTenantAction("users", tenant)}>
                             View Users
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleTenantAction("Billing History", tenant.name)}>
+                          <DropdownMenuItem onClick={() => handleTenantAction("billing", tenant)}>
                             Billing History
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleTenantAction("Suspend Tenant", tenant.name)}>
-                            Suspend Tenant
+                          <DropdownMenuItem onClick={() => handleTenantAction("suspend", tenant)}>
+                            {tenant.status === 'active' ? 'Suspend' : 'Activate'} Tenant
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -288,6 +304,56 @@ const TenantManagementPage = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Create Tenant Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogTrigger asChild>
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Tenant
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Tenant</DialogTitle>
+            <DialogDescription>Add a new client organization to the system</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Organization Name</Label>
+              <Input 
+                id="name" 
+                placeholder="Acme Corporation"
+                value={newTenantName}
+                onChange={(e) => setNewTenantName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="domain">Domain (Optional)</Label>
+              <Input 
+                id="domain" 
+                placeholder="acme.com"
+                value={newTenantDomain}
+                onChange={(e) => setNewTenantDomain(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleCreateTenant} disabled={isCreatingTenant}>
+                {isCreatingTenant ? "Creating..." : "Create Tenant"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tenant Actions Dialog */}
+      <TenantActionsDialog
+        tenant={selectedTenant}
+        isOpen={actionDialogOpen}
+        onClose={closeActionDialog}
+        action={currentAction}
+      />
     </div>
   );
 };

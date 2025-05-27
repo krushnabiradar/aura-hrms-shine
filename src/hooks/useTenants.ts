@@ -113,6 +113,27 @@ export const useTenants = () => {
     }
   });
 
+  // Mutation to delete tenant
+  const deleteTenantMutation = useMutation({
+    mutationFn: async (id: string) => {
+      console.log('Deleting tenant:', id);
+      const { error } = await supabase
+        .from('tenants')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error deleting tenant:', error);
+        throw error;
+      }
+
+      console.log('Tenant deleted successfully');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+    }
+  });
+
   return {
     tenants,
     isLoadingTenants,
@@ -123,6 +144,8 @@ export const useTenants = () => {
     createTenant: createTenantMutation.mutate,
     isCreatingTenant: createTenantMutation.isPending,
     updateTenant: updateTenantMutation.mutate,
-    isUpdatingTenant: updateTenantMutation.isPending
+    isUpdatingTenant: updateTenantMutation.isPending,
+    deleteTenant: deleteTenantMutation.mutate,
+    isDeletingTenant: deleteTenantMutation.isPending
   };
 };

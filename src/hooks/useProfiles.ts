@@ -33,7 +33,7 @@ export const useProfiles = () => {
       console.log('Profiles fetched successfully:', data);
       return data as Profile[];
     },
-    enabled: !!user && user.role === 'system_admin'
+    enabled: !!user && (user.role === 'system_admin' || user.role === 'tenant_admin')
   });
 
   // Query to fetch current user's profile
@@ -46,7 +46,7 @@ export const useProfiles = () => {
     queryFn: async () => {
       if (!user?.id) return null;
       
-      console.log('Fetching current user profile...');
+      console.log('Fetching current profile...');
       const { data, error } = await supabase
         .from('profiles')
         .select('*')

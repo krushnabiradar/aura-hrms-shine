@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Building, Briefcase, Users, Activity, CreditCard, Database, BarChart3 } from "lucide-react";
@@ -10,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Label, Input } from "@/components/ui/dialog";
 
 // Import the existing pages
 import TenantManagementPage from "./TenantManagementPage";
@@ -35,9 +35,15 @@ import { InvitationManager } from "@/components/invitations/InvitationManager";
 const SystemAdminDashboard = () => {
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreateTenantOpen, setIsCreateTenantOpen] = useState(false);
+  const [newTenantData, setNewTenantData] = useState({
+    name: '',
+    domain: '',
+    plan: 'trial' as const
+  });
   
   // Use real data hooks
-  const { tenants, isLoadingTenants } = useTenants();
+  const { tenants, isLoadingTenants, createTenant, isCreatingTenant } = useTenants();
   const { profiles, isLoadingProfiles } = useProfiles();
   const { invitations, isLoadingInvitations } = useInvitations();
   
@@ -54,8 +60,30 @@ const SystemAdminDashboard = () => {
   }, []);
 
   const handleAddTenant = () => {
-    logAction("create_tenant_attempt", "tenants");
-    toast.info("Add tenant functionality not implemented yet");
+    setIsCreateTenantOpen(true);
+  };
+
+  const handleCreateTenant = async () => {
+    if (!newTenantData.name.trim()) {
+      toast.error("Please enter a tenant name");
+      return;
+    }
+
+    try {
+      await createTenant({
+        name: newTenantData.name,
+        domain: newTenantData.domain || null,
+        plan: newTenantData.plan,
+        status: 'active'
+      });
+      
+      logAction("create_tenant", "tenants", undefined, { name: newTenantData.name });
+      toast.success("Tenant created successfully");
+      setIsCreateTenantOpen(false);
+      setNewTenantData({ name: '', domain: '', plan: 'trial' });
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create tenant");
+    }
   };
 
   // Calculate statistics from real data
@@ -224,6 +252,54 @@ const SystemAdminDashboard = () => {
   return (
     <DashboardLayout sidebar={<SystemAdminSidebar />}>
       {renderPageContent()}
+      
+      {/* Add Tenant Dialog */}
+      <Dialog open={isCreateTenantOpen} onOpenChange={setIsCreateTenantOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Tenant</DialogTitle>
+            <DialogDescription>Add a new client organization to the system</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Organization Name</Label>
+              <Input 
+                id="name" 
+                placeholder="Acme Corporation"
+                value={newTenantData.name}
+                onChange={(e) => setNewTenantData(prev => ({ ...prev, name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="domain">Domain (Optional)</Label>
+              <Input 
+                id="domain" 
+                placeholder="acme.com"
+                value={newTenantData.domain}
+                onChange={(e) => setNewTenantData(prev => ({ ...prev, domain: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="plan">Plan</Label>
+              <select 
+                className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
+                value={newTenantData.plan}
+                onChange={(e) => setNewTenantData(prev => ({ ...prev, plan: e.target.value as 'trial' | 'business' | 'enterprise' }))}
+              >
+                <option value="trial">Trial</option>
+                <option value="business">Business</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsCreateTenantOpen(false)}>Cancel</Button>
+              <Button onClick={handleCreateTenant} disabled={isCreatingTenant}>
+                {isCreatingTenant ? "Creating..." : "Create Tenant"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };
