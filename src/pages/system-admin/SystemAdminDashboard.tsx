@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Building, Briefcase, Users, Activity, CreditCard, Database, BarChart3 } from "lucide-react";
@@ -20,11 +19,13 @@ import BillingSubscriptionPage from "./BillingSubscriptionPage";
 import { NotificationPreferences } from "@/components/notifications/NotificationPreferences";
 import { ReportBuilder } from "@/components/reports/ReportBuilder";
 import { SystemSettings } from "@/components/settings/SystemSettings";
+import SystemLogsPage from "./SystemLogsPage";
 
 // Import the new hooks for real data
 import { useTenants } from "@/hooks/useTenants";
 import { useProfiles } from "@/hooks/useProfiles";
 import { useInvitations } from "@/hooks/useInvitations";
+import { useSystemLogs } from "@/hooks/useSystemLogs";
 import { InvitationManager } from "@/components/invitations/InvitationManager";
 
 const SystemAdminDashboard = () => {
@@ -36,6 +37,9 @@ const SystemAdminDashboard = () => {
   const { profiles, isLoadingProfiles } = useProfiles();
   const { invitations, isLoadingInvitations } = useInvitations();
   
+  // Add system logs hook
+  const { logAction } = useSystemLogs();
+
   // Simulating data loading
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -46,6 +50,7 @@ const SystemAdminDashboard = () => {
   }, []);
 
   const handleAddTenant = () => {
+    logAction("create_tenant_attempt", "tenants");
     toast.info("Add tenant functionality not implemented yet");
   };
 
@@ -69,7 +74,7 @@ const SystemAdminDashboard = () => {
       case "/system-admin/analytics":
         return <ReportBuilder />;
       case "/system-admin/logs":
-        return <div className="p-8 text-center text-muted-foreground">System logs coming soon...</div>;
+        return <SystemLogsPage />;
       case "/system-admin/settings":
         return <SystemSettings />;
       case "/system-admin/help":
