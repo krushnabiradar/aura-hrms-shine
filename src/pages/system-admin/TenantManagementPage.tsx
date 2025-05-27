@@ -1,87 +1,63 @@
 
 import { useState } from "react";
-import { Building, Plus, Settings, Users, CreditCard, Shield, Eye, MoreHorizontal } from "lucide-react";
+import { Building, Users, DollarSign, TrendingUp, Plus, MoreHorizontal, Search } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/sonner";
-
-// Mock data
-const tenants = [
-  {
-    id: 1,
-    name: "Acme Corporation",
-    domain: "acme.com",
-    employees: 245,
-    status: "Active",
-    plan: "Enterprise",
-    createdDate: "2023-01-15",
-    adminEmail: "admin@acme.com",
-    subscription: "Annual",
-    storage: "15.2 GB",
-    maxUsers: 500
-  },
-  {
-    id: 2,
-    name: "Globex Industries",
-    domain: "globex.com",
-    employees: 112,
-    status: "Active",
-    plan: "Business",
-    createdDate: "2023-03-22",
-    adminEmail: "hr@globex.com",
-    subscription: "Monthly",
-    storage: "8.7 GB",
-    maxUsers: 200
-  },
-  {
-    id: 3,
-    name: "Stark Innovations",
-    domain: "stark.com",
-    employees: 89,
-    status: "Suspended",
-    plan: "Business",
-    createdDate: "2023-02-10",
-    adminEmail: "admin@stark.com",
-    subscription: "Monthly",
-    storage: "6.3 GB",
-    maxUsers: 200
-  },
-  {
-    id: 4,
-    name: "Wayne Enterprises",
-    domain: "wayne.com",
-    employees: 320,
-    status: "Active",
-    plan: "Enterprise",
-    createdDate: "2023-01-05",
-    adminEmail: "bruce@wayne.com",
-    subscription: "Annual",
-    storage: "22.1 GB",
-    maxUsers: 1000
-  }
-];
+import { useTenants } from "@/hooks/useTenants";
+import { useProfiles } from "@/hooks/useProfiles";
 
 const TenantManagementPage = () => {
-  const [selectedTenant, setSelectedTenant] = useState(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [newTenantName, setNewTenantName] = useState("");
+  const [newTenantDomain, setNewTenantDomain] = useState("");
 
-  const filteredTenants = tenants.filter(tenant =>
-    tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tenant.domain.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Use real data hooks
+  const { tenants, isLoadingTenants, createTenant, isCreatingTenant } = useTenants();
+  const { profiles, isLoadingProfiles } = useProfiles();
 
-  const handleCreateTenant = () => {
-    toast.success("Tenant created successfully");
-    setIsCreateDialogOpen(false);
+  // Calculate real statistics
+  const totalTenants = tenants?.length || 0;
+  const activeTenants = tenants?.filter(t => t.status === 'active').length || 0;
+  const totalUsers = profiles?.length || 0;
+  const totalMRR = tenants?.reduce((sum, tenant) => sum + (tenant.mrr || 0), 0) || 0;
+
+  const filteredTenants = tenants?.filter(tenant => {
+    const matchesSearch = tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (tenant.domain && tenant.domain.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesStatus = filterStatus === "all" || tenant.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  }) || [];
+
+  const handleCreateTenant = async () => {
+    if (!newTenantName.trim()) {
+      toast.error("Please enter a tenant name");
+      return;
+    }
+
+    try {
+      await createTenant({
+        name: newTenantName,
+        domain: newTenantDomain || null,
+        plan: 'trial',
+        status: 'active'
+      });
+      
+      toast.success("Tenant created successfully");
+      setIsCreateDialogOpen(false);
+      setNewTenantName("");
+      setNewTenantDomain("");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create tenant");
+    }
   };
 
   const handleTenantAction = (action: string, tenantName: string) => {
@@ -90,15 +66,32 @@ const TenantManagementPage = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Active":
+      case "active":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "Suspended":
+      case "suspended":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-      case "Pending":
+      case "trial":
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
     }
+  };
+
+  const getPlanColor = (plan: string) => {
+    switch (plan) {
+      case "enterprise":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
+      case "business":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+      case "trial":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+    }
+  };
+
+  const getTenantUserCount = (tenantId: string) => {
+    return profiles?.filter(p => p.tenant_id === tenantId).length || 0;
   };
 
   return (
@@ -106,7 +99,7 @@ const TenantManagementPage = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Tenant Management</h2>
-          <p className="text-muted-foreground">Manage all tenant organizations in the system</p>
+          <p className="text-muted-foreground">Manage client organizations and their configurations</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -115,93 +108,36 @@ const TenantManagementPage = () => {
               Create Tenant
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New Tenant</DialogTitle>
-              <DialogDescription>Set up a new tenant organization in the system</DialogDescription>
+              <DialogDescription>Add a new client organization to the system</DialogDescription>
             </DialogHeader>
-            <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                <TabsTrigger value="plan">Plan & Limits</TabsTrigger>
-                <TabsTrigger value="settings">Settings</TabsTrigger>
-              </TabsList>
-              <TabsContent value="basic" className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="tenantName">Organization Name</Label>
-                    <Input id="tenantName" placeholder="Enter organization name" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="domain">Domain</Label>
-                    <Input id="domain" placeholder="company.com" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="adminEmail">Admin Email</Label>
-                  <Input id="adminEmail" type="email" placeholder="admin@company.com" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" placeholder="Brief description of the organization" />
-                </div>
-              </TabsContent>
-              <TabsContent value="plan" className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="plan">Subscription Plan</Label>
-                    <select className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md">
-                      <option>Starter</option>
-                      <option>Business</option>
-                      <option>Enterprise</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="maxUsers">Max Users</Label>
-                    <Input id="maxUsers" type="number" placeholder="100" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="storage">Storage Limit (GB)</Label>
-                    <Input id="storage" type="number" placeholder="10" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="billing">Billing Cycle</Label>
-                    <select className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md">
-                      <option>Monthly</option>
-                      <option>Annual</option>
-                    </select>
-                  </div>
-                </div>
-              </TabsContent>
-              <TabsContent value="settings" className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Auto Activation</Label>
-                    <p className="text-sm text-muted-foreground">Automatically activate tenant after creation</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Email Notifications</Label>
-                    <p className="text-sm text-muted-foreground">Send welcome email to admin</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Trial Period</Label>
-                    <p className="text-sm text-muted-foreground">Enable 30-day trial period</p>
-                  </div>
-                  <Switch />
-                </div>
-              </TabsContent>
-            </Tabs>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateTenant}>Create Tenant</Button>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Organization Name</Label>
+                <Input 
+                  id="name" 
+                  placeholder="Acme Corporation"
+                  value={newTenantName}
+                  onChange={(e) => setNewTenantName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="domain">Domain (Optional)</Label>
+                <Input 
+                  id="domain" 
+                  placeholder="acme.com"
+                  value={newTenantDomain}
+                  onChange={(e) => setNewTenantDomain(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateTenant} disabled={isCreatingTenant}>
+                  {isCreatingTenant ? "Creating..." : "Create Tenant"}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -214,18 +150,18 @@ const TenantManagementPage = () => {
             <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tenants.length}</div>
-            <p className="text-xs text-muted-foreground">+2 from last month</p>
+            <div className="text-2xl font-bold">{isLoadingTenants ? "..." : totalTenants}</div>
+            <p className="text-xs text-muted-foreground">Organizations managed</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Tenants</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tenants.filter(t => t.status === "Active").length}</div>
-            <p className="text-xs text-muted-foreground">85% of total</p>
+            <div className="text-2xl font-bold">{isLoadingTenants ? "..." : activeTenants}</div>
+            <p className="text-xs text-muted-foreground">Currently operational</p>
           </CardContent>
         </Card>
         <Card>
@@ -234,18 +170,18 @@ const TenantManagementPage = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tenants.reduce((sum, t) => sum + t.employees, 0)}</div>
+            <div className="text-2xl font-bold">{isLoadingProfiles ? "..." : totalUsers}</div>
             <p className="text-xs text-muted-foreground">Across all tenants</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total MRR</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$12,450</div>
-            <p className="text-xs text-muted-foreground">Monthly recurring</p>
+            <div className="text-2xl font-bold">${totalMRR.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Monthly recurring revenue</p>
           </CardContent>
         </Card>
       </div>
@@ -255,14 +191,26 @@ const TenantManagementPage = () => {
           <div className="flex justify-between items-center">
             <div>
               <CardTitle>Tenant Directory</CardTitle>
-              <CardDescription>Manage all tenant organizations</CardDescription>
+              <CardDescription>Manage tenant organizations and their settings</CardDescription>
             </div>
-            <Input
-              placeholder="Search tenants..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm"
-            />
+            <div className="flex gap-2">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="h-10 px-3 py-2 border border-input bg-background rounded-md text-sm"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="trial">Trial</option>
+                <option value="suspended">Suspended</option>
+              </select>
+              <Input
+                placeholder="Search tenants..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -273,54 +221,69 @@ const TenantManagementPage = () => {
                 <TableHead>Domain</TableHead>
                 <TableHead>Plan</TableHead>
                 <TableHead>Users</TableHead>
+                <TableHead>MRR</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredTenants.map((tenant) => (
-                <TableRow key={tenant.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{tenant.name}</div>
-                      <div className="text-sm text-muted-foreground">{tenant.adminEmail}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{tenant.domain}</TableCell>
-                  <TableCell>{tenant.plan}</TableCell>
-                  <TableCell>{tenant.employees}/{tenant.maxUsers}</TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(tenant.status)}`}>
-                      {tenant.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>{tenant.createdDate}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleTenantAction("View Details", tenant.name)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleTenantAction("Configure", tenant.name)}>
-                          <Settings className="mr-2 h-4 w-4" />
-                          Configure
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleTenantAction("Billing", tenant.name)}>
-                          <CreditCard className="mr-2 h-4 w-4" />
-                          Billing
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {isLoadingTenants ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center">
+                    Loading tenant data...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : filteredTenants.length > 0 ? (
+                filteredTenants.map((tenant) => (
+                  <TableRow key={tenant.id}>
+                    <TableCell className="font-medium">{tenant.name}</TableCell>
+                    <TableCell>{tenant.domain || "Not set"}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getPlanColor(tenant.plan)}`}>
+                        {tenant.plan.charAt(0).toUpperCase() + tenant.plan.slice(1)}
+                      </span>
+                    </TableCell>
+                    <TableCell>{getTenantUserCount(tenant.id)}</TableCell>
+                    <TableCell>${tenant.mrr?.toLocaleString() || 0}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(tenant.status)}`}>
+                        {tenant.status.charAt(0).toUpperCase() + tenant.status.slice(1)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm">{new Date(tenant.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleTenantAction("Edit Settings", tenant.name)}>
+                            Edit Settings
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleTenantAction("View Users", tenant.name)}>
+                            View Users
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleTenantAction("Billing History", tenant.name)}>
+                            Billing History
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleTenantAction("Suspend Tenant", tenant.name)}>
+                            Suspend Tenant
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    No tenants found
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

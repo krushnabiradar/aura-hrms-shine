@@ -8,134 +8,36 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/sonner";
-
-// Mock data
-const subscriptions = [
-  {
-    id: 1,
-    tenant: "Acme Corporation",
-    plan: "Enterprise",
-    price: "$299/month",
-    status: "Active",
-    nextBilling: "2024-02-15",
-    users: 245,
-    features: ["Unlimited Users", "Advanced Analytics", "Priority Support"],
-    mrr: 299
-  },
-  {
-    id: 2,
-    tenant: "Globex Industries",
-    plan: "Business",
-    price: "$149/month",
-    status: "Active",
-    nextBilling: "2024-02-20",
-    users: 112,
-    features: ["Up to 200 Users", "Standard Analytics", "Email Support"],
-    mrr: 149
-  },
-  {
-    id: 3,
-    tenant: "Stark Innovations",
-    plan: "Business",
-    price: "$149/month",
-    status: "Past Due",
-    nextBilling: "2024-01-20",
-    users: 89,
-    features: ["Up to 200 Users", "Standard Analytics", "Email Support"],
-    mrr: 0
-  },
-  {
-    id: 4,
-    tenant: "Wayne Enterprises",
-    plan: "Enterprise",
-    price: "$299/month",
-    status: "Active",
-    nextBilling: "2024-02-10",
-    users: 320,
-    features: ["Unlimited Users", "Advanced Analytics", "Priority Support"],
-    mrr: 299
-  }
-];
-
-const billingHistory = [
-  {
-    id: 1,
-    tenant: "Acme Corporation",
-    amount: "$299.00",
-    date: "2024-01-15",
-    status: "Paid",
-    invoiceId: "INV-001234",
-    method: "Credit Card"
-  },
-  {
-    id: 2,
-    tenant: "Globex Industries",
-    amount: "$149.00",
-    date: "2024-01-20",
-    status: "Paid",
-    invoiceId: "INV-001235",
-    method: "Bank Transfer"
-  },
-  {
-    id: 3,
-    tenant: "Wayne Enterprises",
-    amount: "$299.00",
-    date: "2024-01-10",
-    status: "Paid",
-    invoiceId: "INV-001236",
-    method: "Credit Card"
-  },
-  {
-    id: 4,
-    tenant: "Stark Innovations",
-    amount: "$149.00",
-    date: "2024-01-20",
-    status: "Failed",
-    invoiceId: "INV-001237",
-    method: "Credit Card"
-  }
-];
-
-const plans = [
-  {
-    name: "Starter",
-    price: "$49",
-    period: "per month",
-    features: ["Up to 50 Users", "Basic Analytics", "Email Support", "5GB Storage"],
-    limits: { users: 50, storage: 5 }
-  },
-  {
-    name: "Business",
-    price: "$149",
-    period: "per month",
-    features: ["Up to 200 Users", "Standard Analytics", "Priority Email Support", "25GB Storage"],
-    limits: { users: 200, storage: 25 }
-  },
-  {
-    name: "Enterprise",
-    price: "$299",
-    period: "per month",
-    features: ["Unlimited Users", "Advanced Analytics", "Phone Support", "100GB Storage"],
-    limits: { users: "Unlimited", storage: 100 }
-  }
-];
+import { useSubscriptions } from "@/hooks/useSubscriptions";
+import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
+import { useBillingHistory } from "@/hooks/useBillingHistory";
+import { useTenants } from "@/hooks/useTenants";
 
 const BillingSubscriptionPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredSubscriptions = subscriptions.filter(sub =>
-    sub.tenant.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sub.plan.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Use real data hooks
+  const { subscriptions, isLoadingSubscriptions } = useSubscriptions();
+  const { plans, isLoadingPlans } = useSubscriptionPlans();
+  const { billingHistory, isLoadingBillingHistory } = useBillingHistory();
+  const { tenants } = useTenants();
 
-  const filteredBilling = billingHistory.filter(bill =>
-    bill.tenant.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bill.invoiceId.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Calculate real statistics
+  const totalMRR = tenants?.reduce((sum, tenant) => sum + (tenant.mrr || 0), 0) || 0;
+  const activeSubscriptions = subscriptions?.filter(sub => sub.status === "active").length || 0;
+  const pastDueSubscriptions = subscriptions?.filter(sub => sub.status === "past_due").length || 0;
+  const totalRevenue = billingHistory?.filter(bill => bill.status === "paid")
+    .reduce((sum, bill) => sum + Number(bill.amount), 0) || 0;
 
-  const totalMRR = subscriptions.reduce((sum, sub) => sum + sub.mrr, 0);
-  const activeSubscriptions = subscriptions.filter(sub => sub.status === "Active").length;
-  const pastDueSubscriptions = subscriptions.filter(sub => sub.status === "Past Due").length;
+  const filteredSubscriptions = subscriptions?.filter(sub =>
+    sub.tenant?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    sub.plan?.name.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  const filteredBilling = billingHistory?.filter(bill =>
+    bill.tenant?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (bill.invoice_id && bill.invoice_id.toLowerCase().includes(searchTerm.toLowerCase()))
+  ) || [];
 
   const handleBillingAction = (action: string, item: string) => {
     toast.info(`${action} for ${item} executed`);
@@ -143,14 +45,16 @@ const BillingSubscriptionPage = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Active":
-      case "Paid":
+      case "active":
+      case "paid":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "Past Due":
-      case "Failed":
+      case "past_due":
+      case "failed":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-      case "Pending":
+      case "pending":
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+      case "suspended":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
     }
@@ -171,7 +75,7 @@ const BillingSubscriptionPage = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${totalMRR.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+15.2% from last month</p>
+            <p className="text-xs text-muted-foreground">Active subscriptions</p>
           </CardContent>
         </Card>
         <Card>
@@ -180,8 +84,8 @@ const BillingSubscriptionPage = () => {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeSubscriptions}</div>
-            <p className="text-xs text-muted-foreground">87% retention rate</p>
+            <div className="text-2xl font-bold">{isLoadingSubscriptions ? "..." : activeSubscriptions}</div>
+            <p className="text-xs text-muted-foreground">Currently paying</p>
           </CardContent>
         </Card>
         <Card>
@@ -190,18 +94,18 @@ const BillingSubscriptionPage = () => {
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{pastDueSubscriptions}</div>
+            <div className="text-2xl font-bold text-red-600">{isLoadingSubscriptions ? "..." : pastDueSubscriptions}</div>
             <p className="text-xs text-muted-foreground">Requires attention</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Revenue Per User</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$24.50</div>
-            <p className="text-xs text-muted-foreground">+8.3% from last month</p>
+            <div className="text-2xl font-bold">${totalRevenue.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">All time payments</p>
           </CardContent>
         </Card>
       </div>
@@ -236,50 +140,64 @@ const BillingSubscriptionPage = () => {
                     <TableHead>Tenant</TableHead>
                     <TableHead>Plan</TableHead>
                     <TableHead>Price</TableHead>
-                    <TableHead>Users</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Current Period</TableHead>
                     <TableHead>Next Billing</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredSubscriptions.map((subscription) => (
-                    <TableRow key={subscription.id}>
-                      <TableCell className="font-medium">{subscription.tenant}</TableCell>
-                      <TableCell>{subscription.plan}</TableCell>
-                      <TableCell>{subscription.price}</TableCell>
-                      <TableCell>{subscription.users}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(subscription.status)}`}>
-                          {subscription.status}
-                        </span>
-                      </TableCell>
-                      <TableCell>{subscription.nextBilling}</TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleBillingAction("View Details", subscription.tenant)}>
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleBillingAction("Change Plan", subscription.tenant)}>
-                              Change Plan
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleBillingAction("Update Billing", subscription.tenant)}>
-                              Update Billing
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleBillingAction("Cancel Subscription", subscription.tenant)}>
-                              Cancel Subscription
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                  {isLoadingSubscriptions ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center">
+                        Loading subscription data...
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : filteredSubscriptions.length > 0 ? (
+                    filteredSubscriptions.map((subscription) => (
+                      <TableRow key={subscription.id}>
+                        <TableCell className="font-medium">{subscription.tenant?.name || "Unknown"}</TableCell>
+                        <TableCell>{subscription.plan?.name || "Unknown"}</TableCell>
+                        <TableCell>${subscription.plan?.price || 0}/month</TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(subscription.status)}`}>
+                            {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
+                          </span>
+                        </TableCell>
+                        <TableCell>{subscription.current_period_start} - {subscription.current_period_end}</TableCell>
+                        <TableCell>{subscription.next_billing_date || "N/A"}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleBillingAction("View Details", subscription.tenant?.name || "")}>
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleBillingAction("Change Plan", subscription.tenant?.name || "")}>
+                                Change Plan
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleBillingAction("Update Billing", subscription.tenant?.name || "")}>
+                                Update Billing
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleBillingAction("Cancel Subscription", subscription.tenant?.name || "")}>
+                                Cancel Subscription
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        No subscriptions found
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -322,42 +240,56 @@ const BillingSubscriptionPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredBilling.map((bill) => (
-                    <TableRow key={bill.id}>
-                      <TableCell className="font-medium">{bill.invoiceId}</TableCell>
-                      <TableCell>{bill.tenant}</TableCell>
-                      <TableCell>{bill.amount}</TableCell>
-                      <TableCell>{bill.date}</TableCell>
-                      <TableCell>{bill.method}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(bill.status)}`}>
-                          {bill.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleBillingAction("View Invoice", bill.invoiceId)}>
-                              View Invoice
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleBillingAction("Download", bill.invoiceId)}>
-                              Download PDF
-                            </DropdownMenuItem>
-                            {bill.status === "Failed" && (
-                              <DropdownMenuItem onClick={() => handleBillingAction("Retry Payment", bill.invoiceId)}>
-                                Retry Payment
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                  {isLoadingBillingHistory ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center">
+                        Loading billing history...
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : filteredBilling.length > 0 ? (
+                    filteredBilling.map((bill) => (
+                      <TableRow key={bill.id}>
+                        <TableCell className="font-medium">{bill.invoice_id || `INV-${bill.id.slice(0, 8)}`}</TableCell>
+                        <TableCell>{bill.tenant?.name || "Unknown"}</TableCell>
+                        <TableCell>${bill.amount}</TableCell>
+                        <TableCell>{bill.billing_date}</TableCell>
+                        <TableCell>{bill.payment_method || "Unknown"}</TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(bill.status)}`}>
+                            {bill.status.charAt(0).toUpperCase() + bill.status.slice(1)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleBillingAction("View Invoice", bill.invoice_id || "")}>
+                                View Invoice
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleBillingAction("Download", bill.invoice_id || "")}>
+                                Download PDF
+                              </DropdownMenuItem>
+                              {bill.status === "failed" && (
+                                <DropdownMenuItem onClick={() => handleBillingAction("Retry Payment", bill.invoice_id || "")}>
+                                  Retry Payment
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        No billing history found
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -371,34 +303,42 @@ const BillingSubscriptionPage = () => {
               <CardDescription>Configure pricing plans and features</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-6 md:grid-cols-3">
-                {plans.map((plan, index) => (
-                  <Card key={index} className="relative">
-                    <CardHeader>
-                      <CardTitle className="text-lg">{plan.name}</CardTitle>
-                      <div className="text-2xl font-bold">
-                        {plan.price}
-                        <span className="text-sm font-normal text-muted-foreground">/{plan.period}</span>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <ul className="space-y-2 text-sm">
-                        {plan.features.map((feature, idx) => (
-                          <li key={idx} className="flex items-center gap-2">
-                            <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="pt-4 border-t">
-                        <Button variant="outline" className="w-full" onClick={() => handleBillingAction("Edit Plan", plan.name)}>
-                          Edit Plan
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              {isLoadingPlans ? (
+                <div className="text-center">Loading subscription plans...</div>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-3">
+                  {plans?.map((plan) => (
+                    <Card key={plan.id} className="relative">
+                      <CardHeader>
+                        <CardTitle className="text-lg">{plan.name}</CardTitle>
+                        <div className="text-2xl font-bold">
+                          ${plan.price}
+                          <span className="text-sm font-normal text-muted-foreground">/{plan.billing_cycle}</span>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <ul className="space-y-2 text-sm">
+                          {Array.isArray(plan.features) ? plan.features.map((feature: string, idx: number) => (
+                            <li key={idx} className="flex items-center gap-2">
+                              <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                              {feature}
+                            </li>
+                          )) : null}
+                        </ul>
+                        <div className="pt-4 border-t space-y-2 text-xs text-muted-foreground">
+                          <div>Max Users: {plan.max_users || "Unlimited"}</div>
+                          <div>Storage: {plan.storage_gb}GB</div>
+                        </div>
+                        <div className="pt-4 border-t">
+                          <Button variant="outline" className="w-full" onClick={() => handleBillingAction("Edit Plan", plan.name)}>
+                            Edit Plan
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
