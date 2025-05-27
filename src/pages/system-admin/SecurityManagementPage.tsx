@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Shield, Users, Lock, AlertTriangle, Eye, EyeOff, Download } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,6 +82,18 @@ const SecurityManagementPage = () => {
     } catch {
       return String(details);
     }
+  };
+
+  const formatSessionId = (sessionId: any): string => {
+    if (typeof sessionId === 'string') return sessionId.substring(0, 8) + '...';
+    if (typeof sessionId === 'number') return sessionId.toString().substring(0, 8) + '...';
+    return 'Unknown';
+  };
+
+  const formatUserId = (userId: any): string => {
+    if (typeof userId === 'string') return userId.substring(0, 8) + '...';
+    if (typeof userId === 'number') return userId.toString().substring(0, 8) + '...';
+    return 'System';
   };
 
   return (
@@ -230,9 +241,9 @@ const SecurityManagementPage = () => {
                   ) : sessions?.filter(session => session.is_active).map((session) => (
                     <TableRow key={session.id}>
                       <TableCell className="font-mono text-sm">
-                        {String(session.id).substring(0, 8)}...
+                        {formatSessionId(session.id)}
                       </TableCell>
-                      <TableCell>{String(session.user_id).substring(0, 8)}...</TableCell>
+                      <TableCell>{formatUserId(session.user_id)}</TableCell>
                       <TableCell>{session.ip_address || 'Unknown'}</TableCell>
                       <TableCell>{new Date(session.created_at).toLocaleString()}</TableCell>
                       <TableCell>{new Date(session.last_activity).toLocaleString()}</TableCell>
@@ -295,7 +306,7 @@ const SecurityManagementPage = () => {
                         {new Date(log.created_at).toLocaleString()}
                       </TableCell>
                       <TableCell className="font-medium">{log.action}</TableCell>
-                      <TableCell>{log.user_id ? String(log.user_id).substring(0, 8) + "..." : "System"}</TableCell>
+                      <TableCell>{formatUserId(log.user_id)}</TableCell>
                       <TableCell>{log.ip_address || "N/A"}</TableCell>
                       <TableCell>
                         <Badge variant={
