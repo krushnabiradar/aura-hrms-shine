@@ -36,12 +36,26 @@ export const SystemSettings = () => {
     toast.success("Session terminated");
   };
 
-  const renderSettingValue = (value: any) => {
+  const renderSettingValue = (value: any): string => {
     try {
       return JSON.stringify(value, null, 2);
     } catch {
       return String(value);
     }
+  };
+
+  const formatSessionId = (sessionId: string | unknown): string => {
+    if (typeof sessionId === 'string') {
+      return sessionId.substring(0, 8) + "...";
+    }
+    return "Unknown";
+  };
+
+  const formatIpAddress = (ipAddress: string | unknown): string => {
+    if (typeof ipAddress === 'string') {
+      return ipAddress;
+    }
+    return "Unknown";
   };
 
   return (
@@ -142,9 +156,9 @@ export const SystemSettings = () => {
                   sessions.filter(session => session.is_active).slice(0, 10).map((session) => (
                     <div key={session.id} className="flex justify-between items-center p-4 border rounded-lg">
                       <div className="space-y-1">
-                        <div className="font-medium">Session {session.id.substring(0, 8)}...</div>
+                        <div className="font-medium">Session {formatSessionId(session.id)}</div>
                         <div className="text-sm text-muted-foreground">
-                          IP: {session.ip_address || 'Unknown'} | 
+                          IP: {formatIpAddress(session.ip_address)} | 
                           Last Activity: {new Date(session.last_activity).toLocaleString()}
                         </div>
                         <div className="text-xs text-muted-foreground">

@@ -34,12 +34,26 @@ const SystemLogsPage = () => {
     }
   };
 
-  const renderLogDetails = (details: any) => {
+  const renderLogDetails = (details: any): string => {
     try {
       return JSON.stringify(details, null, 2);
     } catch {
       return String(details);
     }
+  };
+
+  const formatUserId = (userId: string | unknown): string => {
+    if (typeof userId === 'string') {
+      return userId.substring(0, 8) + "...";
+    }
+    return "System";
+  };
+
+  const formatIpAddress = (ipAddress: string | unknown): string => {
+    if (typeof ipAddress === 'string') {
+      return ipAddress;
+    }
+    return "N/A";
   };
 
   const filteredLogs = logs?.filter(log => {
@@ -210,8 +224,8 @@ const SystemLogsPage = () => {
                     </TableCell>
                     <TableCell className="font-medium">{log.action}</TableCell>
                     <TableCell>{log.resource_type}</TableCell>
-                    <TableCell>{log.user_id ? log.user_id.substring(0, 8) + "..." : "System"}</TableCell>
-                    <TableCell>{log.ip_address || "N/A"}</TableCell>
+                    <TableCell>{formatUserId(log.user_id)}</TableCell>
+                    <TableCell>{formatIpAddress(log.ip_address)}</TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
