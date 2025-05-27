@@ -1,0 +1,126 @@
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/context/AuthContext';
+import type { Database } from '@/integrations/supabase/types';
+
+type Invitation = Database['public']['Tables']['invitations']['Row'];
+type InvitationInsert = Database['public']['Tables']['invitations']['Insert'];
+
+export const useInvitations = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Query to fetch invitations based on user role
+  const {
+    data: invitations,
+    isLoading: isLoadingInvitations,
+    error: invitationsError
+  } = useQuery({
+    queryKey: ['invitations'],
+    queryFn: async () => {
+      console.log('Fetching invitations...');
+      const { data, error } = await supabase
+        .from('invitations')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching invitations:', error);
+        throw error;
+      }
+
+      console.log('Invitations fetched successfully:', data);
+      return data as Invitation[];
+    },
+    enabled: !!user && (user.role === 'system_admin' || user.role === 'tenant_admin')
+  });
+
+  // Mutation to create invitation
+  const createInvitationMutation = useMutation({
+    mutationFn: async (invitationData: Omit<InvitationInsert, 'token' | 'invited_by'>) => {
+      console.log('Creating invitation:', invitationData);
+      
+      // Generate token using database function
+      const { data: tokenData, error: tokenError } = await supabase
+        .rpc('generate_invitation_token');
+      
+      if (tokenError) {
+        console.error('Error generating token:', tokenError);
+        throw tokenError;
+      }
+
+      const { data, error } = await supabase
+        .from('invitations')
+        .insert({
+          ...invitationData,
+          token: tokenData,
+          invited_by: user!.id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating invitation:', error);
+        throw error;
+      }
+
+      console.log('Invitation created successfully:', data);
+      return data as Invitation;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invitations'] });
+    }
+  });
+
+  // Function to validate invitation token
+  const validateInvitation = async (token: string) => {
+    console.log('Validating invitation token...');
+    const { data, error } = await supabase
+      .rpc('validate_invitation_token', { token_value: token });
+
+    if (error) {
+      console.error('Error validating invitation:', error);
+      throw error;
+    }
+
+    console.log('Invitation validation result:', data);
+    return data?.[0] || null;
+  };
+
+  // Function to accept invitation during signup
+  const acceptInvitation = async (token: string, firstName: string, lastName: string) => {
+    console.log('Accepting invitation...');
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    
+    if (!authUser) {
+      throw new Error('User must be authenticated to accept invitation');
+    }
+
+    const { data, error } = await supabase
+      .rpc('accept_invitation', {
+        token_value: token,
+        user_id: authUser.id,
+        first_name: firstName,
+        last_name: lastName
+      });
+
+    if (error) {
+      console.error('Error accepting invitation:', error);
+      throw error;
+    }
+
+    console.log('Invitation accepted successfully:', data);
+    return data;
+  };
+
+  return {
+    invitations,
+    isLoadingInvitations,
+    invitationsError,
+    createInvitation: createInvitationMutation.mutate,
+    isCreatingInvitation: createInvitationMutation.isPending,
+    validateInvitation,
+    acceptInvitation
+  };
+};

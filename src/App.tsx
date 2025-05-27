@@ -13,6 +13,7 @@ import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import InviteAccept from "./pages/InviteAccept";
 import SystemAdminDashboard from "./pages/system-admin/SystemAdminDashboard";
 import TenantAdminDashboard from "./pages/tenant-admin/TenantAdminDashboard";
 import EmployeeDashboard from "./pages/ess/EmployeeDashboard";
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/landing" element={<Landing />} />
               <Route path="/login" element={<Auth />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/invite" element={<InviteAccept />} />
               
               {/* System Admin Routes */}
               <Route element={<ProtectedRoute allowedRoles={["system_admin"]} />}>

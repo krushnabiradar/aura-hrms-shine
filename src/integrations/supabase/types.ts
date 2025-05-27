@@ -129,6 +129,53 @@ export type Database = {
           },
         ]
       }
+      invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          role: Database["public"]["Enums"]["user_role"]
+          tenant_id: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          role?: Database["public"]["Enums"]["user_role"]
+          tenant_id: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          tenant_id?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_requests: {
         Row: {
           approved_at: string | null
@@ -335,6 +382,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation: {
+        Args: {
+          token_value: string
+          user_id: string
+          first_name: string
+          last_name: string
+        }
+        Returns: boolean
+      }
+      generate_invitation_token: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_user_employee_id: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -358,6 +418,16 @@ export type Database = {
       is_tenant_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      validate_invitation_token: {
+        Args: { token_value: string }
+        Returns: {
+          invitation_id: string
+          email: string
+          tenant_id: string
+          role: Database["public"]["Enums"]["user_role"]
+          is_valid: boolean
+        }[]
       }
     }
     Enums: {
