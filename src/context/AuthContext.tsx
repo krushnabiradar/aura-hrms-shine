@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Create profile from user metadata if missing
+  // Create profile from user metadata with improved error handling
   const createProfileFromMetadata = async (supabaseUser: SupabaseUser) => {
     try {
       console.log('Creating profile from user metadata for:', supabaseUser.id);
@@ -53,16 +53,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       const { data: profile, error } = await supabase
         .from('profiles')
-        .insert(profileData)
+        .upsert(profileData, { 
+          onConflict: 'id',
+          ignoreDuplicates: false 
+        })
         .select()
         .single();
 
       if (error) {
-        console.error('Error creating profile from metadata:', error);
-        return null;
+        console.error('Error creating/updating profile from metadata:', error);
+        
+        // Try a simple insert if upsert fails
+        const { data: insertedProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert(profileData)
+          .select()
+          .single();
+          
+        if (insertError) {
+          console.error('Error inserting profile:', insertError);
+          return null;
+        }
+        
+        console.log('Profile inserted successfully:', insertedProfile);
+        return insertedProfile;
       }
 
-      console.log('Profile created successfully from metadata:', profile);
+      console.log('Profile created/updated successfully from metadata:', profile);
       return profile;
     } catch (error) {
       console.error('Error in createProfileFromMetadata:', error);
@@ -70,7 +87,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Fetch user profile from profiles table with fallback creation
+  // Fetch user profile with enhanced fallback logic
   const fetchUserProfile = async (userId: string) => {
     try {
       console.log('Fetching profile for user:', userId);
@@ -78,18 +95,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching user profile:', error);
-        
-        // If profile doesn't exist, try to create it from user metadata
-        if (error.code === 'PGRST116') {
-          console.log('Profile not found, attempting to create from user metadata');
-          const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-          if (supabaseUser) {
-            return await createProfileFromMetadata(supabaseUser);
-          }
+        return null;
+      }
+
+      if (!profile) {
+        console.log('Profile not found, attempting to create from user metadata');
+        const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+        if (supabaseUser) {
+          return await createProfileFromMetadata(supabaseUser);
         }
         return null;
       }
@@ -105,7 +122,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Set user from profile data
   const setUserFromProfile = (profile: any) => {
     if (profile) {
-      setUser({
+      const userData: User = {
         id: profile.id,
         email: profile.email,
         first_name: profile.first_name,
@@ -113,8 +130,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         role: profile.role,
         tenant_id: profile.tenant_id,
         avatar_url: profile.avatar_url
-      });
+      };
+      console.log('Setting user from profile:', userData);
+      setUser(userData);
     } else {
+      console.log('No profile data, setting user to null');
       setUser(null);
     }
   };
@@ -163,7 +183,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signup = async (email: string, password: string, userData?: { first_name?: string; last_name?: string; role?: UserRole }) => {
     setIsLoading(true);
     try {
-      console.log('Starting signup process for:', email);
+      console.log('Starting signup process for:', email, 'with role:', userData?.role);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,

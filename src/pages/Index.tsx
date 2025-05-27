@@ -14,31 +14,37 @@ const Index = () => {
     console.log('Index useEffect - isAuthenticated:', isAuthenticated, 'user:', user, 'isLoading:', isLoading);
     
     if (!isLoading && isAuthenticated) {
-      if (user) {
+      if (user?.role) {
         console.log('Redirecting user with role:', user.role);
         switch (user.role) {
           case "system_admin":
-            navigate("/system-admin");
+            console.log('Navigating to system-admin dashboard');
+            navigate("/system-admin", { replace: true });
             break;
           case "tenant_admin":
-            navigate("/tenant-admin");
+            console.log('Navigating to tenant-admin dashboard');
+            navigate("/tenant-admin", { replace: true });
             break;
           case "employee":
-            navigate("/ess");
+            console.log('Navigating to employee dashboard');
+            navigate("/ess", { replace: true });
             break;
           default:
             console.warn('Unknown user role:', user.role);
-            navigate("/ess"); // Default to employee dashboard
+            navigate("/ess", { replace: true }); // Default to employee dashboard
             break;
         }
+      } else if (user) {
+        console.log('User authenticated but no role found, defaulting to employee dashboard');
+        navigate("/ess", { replace: true });
       } else {
         console.log('User authenticated but no profile found, redirecting to auth');
-        navigate("/auth");
+        navigate("/auth", { replace: true });
       }
     } else if (!isLoading && !isAuthenticated) {
       // If not authenticated, redirect to landing page
       console.log('User not authenticated, redirecting to landing');
-      navigate("/landing");
+      navigate("/landing", { replace: true });
     }
   }, [isAuthenticated, user, isLoading, navigate]);
 
