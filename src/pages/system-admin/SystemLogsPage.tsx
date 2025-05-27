@@ -34,6 +34,14 @@ const SystemLogsPage = () => {
     }
   };
 
+  const renderLogDetails = (details: any) => {
+    try {
+      return JSON.stringify(details, null, 2);
+    } catch {
+      return String(details);
+    }
+  };
+
   const filteredLogs = logs?.filter(log => {
     const matchesSearch = log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          log.resource_type.toLowerCase().includes(searchTerm.toLowerCase());
@@ -52,9 +60,10 @@ const SystemLogsPage = () => {
     toast.success("Log cleanup initiated");
   };
 
-  const handleViewDetails = (logId: string) => {
+  const handleViewDetails = (logId: string, details: any) => {
     logAction("view_log_details", "system_logs", logId);
-    toast.info("Log details viewed");
+    console.log("Log details:", renderLogDetails(details));
+    toast.info("Log details viewed in console");
   };
 
   return (
@@ -207,7 +216,7 @@ const SystemLogsPage = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleViewDetails(log.id)}
+                        onClick={() => handleViewDetails(log.id, log.details)}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>

@@ -36,6 +36,14 @@ export const SystemSettings = () => {
     toast.success("Session terminated");
   };
 
+  const renderSettingValue = (value: any) => {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -76,7 +84,7 @@ export const SystemSettings = () => {
                       <Badge variant="outline">Security</Badge>
                     </div>
                     <div className="text-sm bg-gray-50 dark:bg-gray-900 p-3 rounded">
-                      <pre>{JSON.stringify(setting.setting_value, null, 2)}</pre>
+                      <pre>{renderSettingValue(setting.setting_value)}</pre>
                     </div>
                   </div>
                 ))
@@ -108,7 +116,7 @@ export const SystemSettings = () => {
                       <Badge variant="outline">Authentication</Badge>
                     </div>
                     <div className="text-sm bg-gray-50 dark:bg-gray-900 p-3 rounded">
-                      <pre>{JSON.stringify(setting.setting_value, null, 2)}</pre>
+                      <pre>{renderSettingValue(setting.setting_value)}</pre>
                     </div>
                   </div>
                 ))
@@ -189,7 +197,7 @@ export const SystemSettings = () => {
                       <Badge variant="outline">Compliance</Badge>
                     </div>
                     <div className="text-sm bg-gray-50 dark:bg-gray-900 p-3 rounded">
-                      <pre>{JSON.stringify(setting.setting_value, null, 2)}</pre>
+                      <pre>{renderSettingValue(setting.setting_value)}</pre>
                     </div>
                   </div>
                 ))
