@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Shield, Users, Lock, AlertTriangle, Eye, EyeOff, Download } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -244,7 +245,7 @@ const SecurityManagementPage = () => {
                         {formatSessionId(session.id)}
                       </TableCell>
                       <TableCell>{formatUserId(session.user_id)}</TableCell>
-                      <TableCell>{session.ip_address || 'Unknown'}</TableCell>
+                      <TableCell>{session.ip_address ? String(session.ip_address) : 'Unknown'}</TableCell>
                       <TableCell>{new Date(session.created_at).toLocaleString()}</TableCell>
                       <TableCell>{new Date(session.last_activity).toLocaleString()}</TableCell>
                       <TableCell>
@@ -307,7 +308,7 @@ const SecurityManagementPage = () => {
                       </TableCell>
                       <TableCell className="font-medium">{log.action}</TableCell>
                       <TableCell>{formatUserId(log.user_id)}</TableCell>
-                      <TableCell>{log.ip_address || "N/A"}</TableCell>
+                      <TableCell>{log.ip_address ? String(log.ip_address) : "N/A"}</TableCell>
                       <TableCell>
                         <Badge variant={
                           log.severity === 'error' ? 'destructive' :
