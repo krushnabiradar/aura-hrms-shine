@@ -12,6 +12,7 @@ import { useTenants } from "@/hooks/useTenants";
 import type { Database } from '@/integrations/supabase/types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
+type UserRole = 'system_admin' | 'tenant_admin' | 'employee';
 
 interface UserActionsDialogProps {
   user: Profile | null;
@@ -21,11 +22,16 @@ interface UserActionsDialogProps {
 }
 
 export const UserActionsDialog = ({ user, isOpen, onClose, action }: UserActionsDialogProps) => {
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState<{
+    first_name: string;
+    last_name: string;
+    email: string;
+    role: UserRole;
+  }>({
     first_name: user?.first_name || '',
     last_name: user?.last_name || '',
     email: user?.email || '',
-    role: user?.role || 'employee'
+    role: (user?.role as UserRole) || 'employee'
   });
 
   const { updateProfile, isUpdatingProfile } = useProfiles();
@@ -142,7 +148,7 @@ export const UserActionsDialog = ({ user, isOpen, onClose, action }: UserActions
             </div>
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
-              <Select value={editForm.role} onValueChange={(value) => setEditForm(prev => ({ ...prev, role: value }))}>
+              <Select value={editForm.role} onValueChange={(value: UserRole) => setEditForm(prev => ({ ...prev, role: value }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

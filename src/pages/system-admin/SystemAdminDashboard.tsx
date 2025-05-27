@@ -9,7 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Label, Input } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 // Import the existing pages
 import TenantManagementPage from "./TenantManagementPage";
@@ -32,14 +34,20 @@ import { useInvitations } from "@/hooks/useInvitations";
 import { useSystemLogs } from "@/hooks/useSystemLogs";
 import { InvitationManager } from "@/components/invitations/InvitationManager";
 
+type TenantPlan = 'trial' | 'business' | 'enterprise';
+
 const SystemAdminDashboard = () => {
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateTenantOpen, setIsCreateTenantOpen] = useState(false);
-  const [newTenantData, setNewTenantData] = useState({
+  const [newTenantData, setNewTenantData] = useState<{
+    name: string;
+    domain: string;
+    plan: TenantPlan;
+  }>({
     name: '',
     domain: '',
-    plan: 'trial' as const
+    plan: 'trial'
   });
   
   // Use real data hooks
@@ -284,7 +292,7 @@ const SystemAdminDashboard = () => {
               <select 
                 className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
                 value={newTenantData.plan}
-                onChange={(e) => setNewTenantData(prev => ({ ...prev, plan: e.target.value as 'trial' | 'business' | 'enterprise' }))}
+                onChange={(e) => setNewTenantData(prev => ({ ...prev, plan: e.target.value as TenantPlan }))}
               >
                 <option value="trial">Trial</option>
                 <option value="business">Business</option>
