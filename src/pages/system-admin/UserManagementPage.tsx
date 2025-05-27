@@ -12,86 +12,77 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "@/components/ui/sonner";
-
-// Mock data
-const systemUsers = [
-  {
-    id: 1,
-    name: "System Administrator",
-    email: "admin@aurahrms.com",
-    role: "System Admin",
-    tenant: "System",
-    status: "Active",
-    lastLogin: "2024-01-15 10:30",
-    permissions: ["Full Access"],
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=admin"
-  },
-  {
-    id: 2,
-    name: "John Smith",
-    email: "john@acme.com",
-    role: "Tenant Admin",
-    tenant: "Acme Corporation",
-    status: "Active",
-    lastLogin: "2024-01-14 16:45",
-    permissions: ["Tenant Management", "User Management"],
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=john"
-  },
-  {
-    id: 3,
-    name: "Sarah Johnson",
-    email: "sarah@globex.com",
-    role: "HR Manager",
-    tenant: "Globex Industries",
-    status: "Active",
-    lastLogin: "2024-01-14 14:20",
-    permissions: ["Employee Management", "Leave Management"],
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah"
-  },
-  {
-    id: 4,
-    name: "Mike Wilson",
-    email: "mike@stark.com",
-    role: "Employee",
-    tenant: "Stark Innovations",
-    status: "Suspended",
-    lastLogin: "2024-01-10 09:15",
-    permissions: ["Basic Access"],
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=mike"
-  }
-];
+import { useProfiles } from "@/hooks/useProfiles";
+import { useTenants } from "@/hooks/useTenants";
+import { useInvitations } from "@/hooks/useInvitations";
+import { UserRole } from "@/context/AuthContext";
 
 const roles = [
   { value: "system_admin", label: "System Admin", permissions: ["Full System Access"] },
   { value: "tenant_admin", label: "Tenant Admin", permissions: ["Tenant Management", "User Management", "Billing"] },
-  { value: "hr_manager", label: "HR Manager", permissions: ["Employee Management", "Leave Management", "Attendance"] },
   { value: "employee", label: "Employee", permissions: ["Basic Access", "Profile Management"] }
 ];
 
 const UserManagementPage = () => {
-  const [selectedUser, setSelectedUser] = useState(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserRole, setNewUserRole] = useState<UserRole>("employee");
+  const [selectedTenantId, setSelectedTenantId] = useState("");
 
-  const filteredUsers = systemUsers.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.tenant.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = filterRole === "all" || user.role.toLowerCase().includes(filterRole.toLowerCase());
+  // Use real data hooks
+  const { profiles, isLoadingProfiles } = useProfiles();
+  const { tenants } = useTenants();
+  const { invitations, isLoadingInvitations, createInvitation, isCreatingInvitation } = useInvitations();
+
+  // Calculate real statistics
+  const totalUsers = profiles?.length || 0;
+  const systemAdmins = profiles?.filter(p => p.role === 'system_admin').length || 0;
+  const activeUsers = profiles?.length || 0; // All profiles are considered active
+  const pendingInvitations = invitations?.filter(i => !i.accepted_at).length || 0;
+
+  const filteredUsers = profiles?.filter(user => {
+    const matchesSearch = user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = filterRole === "all" || user.role === filterRole;
     return matchesSearch && matchesRole;
-  });
+  }) || [];
 
-  const handleCreateUser = () => {
-    toast.success("User created successfully");
-    setIsCreateDialogOpen(false);
+  const handleCreateUser = async () => {
+    if (!newUserEmail || !newUserRole) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    if (newUserRole !== 'system_admin' && !selectedTenantId) {
+      toast.error("Please select a tenant for non-system admin users");
+      return;
+    }
+
+    try {
+      await createInvitation({
+        email: newUserEmail,
+        role: newUserRole,
+        tenant_id: newUserRole === 'system_admin' ? null : selectedTenantId
+      });
+      
+      toast.success("User invitation sent successfully");
+      setIsCreateDialogOpen(false);
+      setNewUserEmail("");
+      setNewUserRole("employee");
+      setSelectedTenantId("");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create user invitation");
+    }
   };
 
   const handleUserAction = (action: string, userName: string) => {
     toast.info(`${action} for ${userName} executed`);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string = "Active") => {
     switch (status) {
       case "Active":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
@@ -106,15 +97,34 @@ const UserManagementPage = () => {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case "System Admin":
+      case "system_admin":
         return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
-      case "Tenant Admin":
+      case "tenant_admin":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-      case "HR Manager":
+      case "employee":
         return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
     }
+  };
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case "system_admin":
+        return "System Admin";
+      case "tenant_admin":
+        return "Tenant Admin";
+      case "employee":
+        return "Employee";
+      default:
+        return role;
+    }
+  };
+
+  const getTenantName = (tenantId: string | null) => {
+    if (!tenantId) return "System";
+    const tenant = tenants?.find(t => t.id === tenantId);
+    return tenant?.name || "Unknown";
   };
 
   return (
@@ -134,97 +144,52 @@ const UserManagementPage = () => {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create New User</DialogTitle>
-              <DialogDescription>Add a new user to the system with specific roles and permissions</DialogDescription>
+              <DialogDescription>Send an invitation to a new user with specific roles and permissions</DialogDescription>
             </DialogHeader>
-            <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                <TabsTrigger value="role">Role & Access</TabsTrigger>
-                <TabsTrigger value="settings">Settings</TabsTrigger>
-              </TabsList>
-              <TabsContent value="basic" className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input id="firstName" placeholder="John" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input id="lastName" placeholder="Doe" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input id="email" type="email" placeholder="john.doe@company.com" />
-                </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="john.doe@company.com"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="role">User Role</Label>
+                <select 
+                  className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                >
+                  {roles.map(role => (
+                    <option key={role.value} value={role.value}>{role.label}</option>
+                  ))}
+                </select>
+              </div>
+              {newUserRole !== 'system_admin' && (
                 <div className="space-y-2">
                   <Label htmlFor="tenant">Tenant Organization</Label>
-                  <select className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md">
+                  <select 
+                    className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
+                    value={selectedTenantId}
+                    onChange={(e) => setSelectedTenantId(e.target.value)}
+                  >
                     <option value="">Select Tenant</option>
-                    <option value="acme">Acme Corporation</option>
-                    <option value="globex">Globex Industries</option>
-                    <option value="stark">Stark Innovations</option>
-                  </select>
-                </div>
-              </TabsContent>
-              <TabsContent value="role" className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="role">User Role</Label>
-                  <select className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md">
-                    {roles.map(role => (
-                      <option key={role.value} value={role.value}>{role.label}</option>
+                    {tenants?.map(tenant => (
+                      <option key={tenant.id} value={tenant.id}>{tenant.name}</option>
                     ))}
                   </select>
                 </div>
-                <div className="space-y-4">
-                  <Label>Permissions</Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch id="perm1" />
-                      <Label htmlFor="perm1">User Management</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="perm2" />
-                      <Label htmlFor="perm2">Tenant Management</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="perm3" />
-                      <Label htmlFor="perm3">Billing Access</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="perm4" />
-                      <Label htmlFor="perm4">System Analytics</Label>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-              <TabsContent value="settings" className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Account Active</Label>
-                    <p className="text-sm text-muted-foreground">User can log in to the system</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Email Verification Required</Label>
-                    <p className="text-sm text-muted-foreground">User must verify email before access</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Two-Factor Authentication</Label>
-                    <p className="text-sm text-muted-foreground">Require 2FA for this user</p>
-                  </div>
-                  <Switch />
-                </div>
-              </TabsContent>
-            </Tabs>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateUser}>Create User</Button>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateUser} disabled={isCreatingInvitation}>
+                  {isCreatingInvitation ? "Sending..." : "Send Invitation"}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -237,7 +202,7 @@ const UserManagementPage = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{systemUsers.length}</div>
+            <div className="text-2xl font-bold">{isLoadingProfiles ? "..." : totalUsers}</div>
             <p className="text-xs text-muted-foreground">Across all tenants</p>
           </CardContent>
         </Card>
@@ -247,18 +212,18 @@ const UserManagementPage = () => {
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{systemUsers.filter(u => u.role === "System Admin").length}</div>
+            <div className="text-2xl font-bold">{isLoadingProfiles ? "..." : systemAdmins}</div>
             <p className="text-xs text-muted-foreground">Super admin access</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
+            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{systemUsers.filter(u => u.status === "Active").length}</div>
-            <p className="text-xs text-muted-foreground">Currently online</p>
+            <div className="text-2xl font-bold">{isLoadingProfiles ? "..." : activeUsers}</div>
+            <p className="text-xs text-muted-foreground">Currently registered</p>
           </CardContent>
         </Card>
         <Card>
@@ -267,7 +232,7 @@ const UserManagementPage = () => {
             <Mail className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">{isLoadingInvitations ? "..." : pendingInvitations}</div>
             <p className="text-xs text-muted-foreground">Awaiting response</p>
           </CardContent>
         </Card>
@@ -287,9 +252,8 @@ const UserManagementPage = () => {
                 className="h-10 px-3 py-2 border border-input bg-background rounded-md text-sm"
               >
                 <option value="all">All Roles</option>
-                <option value="system">System Admin</option>
-                <option value="tenant">Tenant Admin</option>
-                <option value="hr">HR Manager</option>
+                <option value="system_admin">System Admin</option>
+                <option value="tenant_admin">Tenant Admin</option>
                 <option value="employee">Employee</option>
               </select>
               <Input
@@ -309,62 +273,81 @@ const UserManagementPage = () => {
                 <TableHead>Role</TableHead>
                 <TableHead>Tenant</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Last Login</TableHead>
+                <TableHead>Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.avatar} />
-                        <AvatarFallback>{user.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getRoleColor(user.role)}`}>
-                      {user.role}
-                    </span>
-                  </TableCell>
-                  <TableCell>{user.tenant}</TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(user.status)}`}>
-                      {user.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm">{user.lastLogin}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleUserAction("Edit User", user.name)}>
-                          Edit User
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleUserAction("Reset Password", user.name)}>
-                          Reset Password
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleUserAction("View Permissions", user.name)}>
-                          View Permissions
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleUserAction("Suspend User", user.name)}>
-                          Suspend User
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {isLoadingProfiles ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center">
+                    Loading user data...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : filteredUsers.length > 0 ? (
+                filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={user.avatar_url || undefined} />
+                          <AvatarFallback>
+                            {user.first_name?.[0] || user.email[0].toUpperCase()}
+                            {user.last_name?.[0] || ""}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">
+                            {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.email}
+                          </div>
+                          <div className="text-sm text-muted-foreground">{user.email}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getRoleColor(user.role)}`}>
+                        {getRoleLabel(user.role)}
+                      </span>
+                    </TableCell>
+                    <TableCell>{getTenantName(user.tenant_id)}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor("Active")}`}>
+                        Active
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm">{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleUserAction("Edit User", user.email)}>
+                            Edit User
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleUserAction("Reset Password", user.email)}>
+                            Reset Password
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleUserAction("View Permissions", user.email)}>
+                            View Permissions
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleUserAction("Suspend User", user.email)}>
+                            Suspend User
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    No users found
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
