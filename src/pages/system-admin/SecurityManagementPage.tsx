@@ -63,6 +63,28 @@ const SecurityManagementPage = () => {
 
   const securityLevel = getSecurityLevel();
 
+  const formatSettingValue = (value: any): string => {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return value.toString();
+    if (typeof value === 'boolean') return value ? 'Enabled' : 'Disabled';
+    if (value === null || value === undefined) return 'Not set';
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  };
+
+  const formatLogDetails = (details: any): string => {
+    if (typeof details === 'string') return details;
+    if (details === null || details === undefined) return 'N/A';
+    try {
+      return JSON.stringify(details);
+    } catch {
+      return String(details);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -146,9 +168,7 @@ const SecurityManagementPage = () => {
                       <div className="font-medium">{setting.setting_key.replace(/_/g, ' ').toUpperCase()}</div>
                       <div className="text-sm text-muted-foreground">{setting.description}</div>
                       <div className="text-xs text-muted-foreground">
-                        Current: {typeof setting.setting_value === 'boolean' ? 
-                          (setting.setting_value ? 'Enabled' : 'Disabled') : 
-                          String(setting.setting_value)}
+                        Current: {formatSettingValue(setting.setting_value)}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -286,7 +306,7 @@ const SecurityManagementPage = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-xs truncate">
-                        {String(log.details)}
+                        {formatLogDetails(log.details)}
                       </TableCell>
                     </TableRow>
                   ))}
