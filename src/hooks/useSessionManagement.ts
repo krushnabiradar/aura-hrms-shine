@@ -39,7 +39,7 @@ export const useSessionManagement = () => {
         .eq('setting_key', 'session_concurrent_limit')
         .single();
         
-      const limit = limitSetting ? parseInt(limitSetting.setting_value as string) : 3;
+      const limit = limitSetting ? parseInt(String(limitSetting.setting_value)) : 3;
 
       // Calculate concurrent session violations
       const userSessionCounts = activeSessions?.reduce((acc, session) => {
@@ -80,7 +80,7 @@ export const useSessionManagement = () => {
         .eq('setting_key', 'session_concurrent_limit')
         .single();
         
-      const limit = limitSetting ? parseInt(limitSetting.setting_value as string) : 3;
+      const limit = limitSetting ? parseInt(String(limitSetting.setting_value)) : 3;
       
       // Count current active sessions for user
       const { data: currentSessions } = await supabase

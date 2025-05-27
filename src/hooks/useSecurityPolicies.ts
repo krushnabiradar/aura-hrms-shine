@@ -26,7 +26,7 @@ export const useSecurityPolicies = () => {
         .single();
         
       if (timeoutSetting) {
-        const timeoutSeconds = parseInt(timeoutSetting.setting_value as string);
+        const timeoutSeconds = parseInt(String(timeoutSetting.setting_value));
         const cutoffTime = new Date(Date.now() - timeoutSeconds * 1000).toISOString();
         
         const { data: expiredSessions } = await supabase
@@ -48,7 +48,7 @@ export const useSecurityPolicies = () => {
         .single();
         
       if (limitSetting) {
-        const limit = parseInt(limitSetting.setting_value as string);
+        const limit = parseInt(String(limitSetting.setting_value));
         
         // Get session counts per user
         const { data: sessionCounts } = await supabase
@@ -94,7 +94,7 @@ export const useSecurityPolicies = () => {
         throw new Error('Session timeout setting not found');
       }
       
-      const timeoutSeconds = parseInt(timeoutSetting.setting_value as string);
+      const timeoutSeconds = parseInt(String(timeoutSetting.setting_value));
       const cutoffTime = new Date(Date.now() - timeoutSeconds * 1000).toISOString();
       
       // Update expired sessions

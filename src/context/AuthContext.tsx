@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
@@ -150,6 +151,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       // Get IP address (simplified for demo)
       const ipAddress = '127.0.0.1'; // In production, get from server
+
+      // Get concurrent session limit
+      const { data: limitSetting } = await supabase
+        .from('security_settings')
+        .select('setting_value')
+        .eq('setting_key', 'session_concurrent_limit')
+        .single();
+        
+      const limit = limitSetting ? parseInt(String(limitSetting.setting_value)) : 3;
+      
+      // Count current active sessions for user
+      const { data: currentSessions } = await supabase
+        .from('user_sessions')
+        .select('id, last_activity')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
+        .order('last_activity', { ascending: true });
+        
+      // If limit exceeded, deactivate oldest session
+      if (currentSessions && currentSessions.length >= limit) {
+        await supabase
+          .from('user_sessions')
+          .update({ is_active: false })
+          .eq('id', currentSessions[0].id);
+      }
 
       const { error } = await supabase
         .from('user_sessions')
