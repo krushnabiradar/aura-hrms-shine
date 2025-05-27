@@ -34,7 +34,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
 
   // Create profile from user metadata with improved error handling
   const createProfileFromMetadata = async (supabaseUser: SupabaseUser) => {
@@ -146,73 +145,92 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     console.log('Setting up auth state listener');
     
     let isMounted = true;
+    let isInitialized = false;
     
-    // Add a timeout to ensure we don't stay in loading state forever
-    const loadingTimeout = setTimeout(() => {
-      if (isMounted && !initialized) {
-        console.log('Auth initialization timeout, setting loading to false');
-        setIsLoading(false);
-        setInitialized(true);
+    const initializeAuth = async () => {
+      try {
+        // First, get the current session
+        console.log('Getting initial session...');
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting initial session:', error);
+        } else {
+          console.log('Initial session:', initialSession?.user?.id || 'No session');
+          
+          if (isMounted && !isInitialized) {
+            setSession(initialSession);
+            
+            if (initialSession?.user) {
+              console.log('Found initial session, fetching profile...');
+              const profile = await fetchUserProfile(initialSession.user.id);
+              if (isMounted) {
+                setUserFromProfile(profile);
+              }
+            } else {
+              console.log('No initial session found');
+              if (isMounted) {
+                setUser(null);
+              }
+            }
+            
+            isInitialized = true;
+            if (isMounted) {
+              setIsLoading(false);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error in initializeAuth:', error);
+        if (isMounted && !isInitialized) {
+          setIsLoading(false);
+          isInitialized = true;
+        }
       }
-    }, 5000); // 5 second timeout
-    
+    };
+
     // Set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
         
-        console.log('Auth state changed:', event, session?.user?.id);
-        setSession(session);
+        console.log('Auth state changed:', event, session?.user?.id || 'No session');
         
-        if (session?.user) {
-          console.log('User logged in, fetching profile...');
-          const profile = await fetchUserProfile(session.user.id);
-          if (isMounted) {
-            setUserFromProfile(profile);
+        // Only handle auth changes after initial setup
+        if (isInitialized) {
+          setSession(session);
+          
+          if (session?.user) {
+            console.log('User logged in via state change, fetching profile...');
+            const profile = await fetchUserProfile(session.user.id);
+            if (isMounted) {
+              setUserFromProfile(profile);
+            }
+          } else {
+            console.log('User logged out via state change');
+            if (isMounted) {
+              setUser(null);
+            }
           }
-        } else {
-          console.log('User logged out');
-          if (isMounted) {
-            setUser(null);
-          }
-        }
-        
-        if (isMounted) {
-          setIsLoading(false);
-          setInitialized(true);
-          clearTimeout(loadingTimeout);
         }
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!isMounted) return;
-      
-      console.log('Initial session check:', session?.user?.id);
-      setSession(session);
-      
-      if (session?.user) {
-        fetchUserProfile(session.user.id).then(profile => {
-          if (isMounted) {
-            setUserFromProfile(profile);
-            setIsLoading(false);
-            setInitialized(true);
-            clearTimeout(loadingTimeout);
-          }
-        });
-      } else {
-        if (isMounted) {
-          setIsLoading(false);
-          setInitialized(true);
-          clearTimeout(loadingTimeout);
-        }
+    // Initialize auth state
+    initializeAuth();
+
+    // Add a safety timeout of 10 seconds
+    const timeoutId = setTimeout(() => {
+      if (isMounted && !isInitialized) {
+        console.log('Auth initialization timeout after 10 seconds');
+        setIsLoading(false);
+        isInitialized = true;
       }
-    });
+    }, 10000);
 
     return () => {
       isMounted = false;
-      clearTimeout(loadingTimeout);
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);

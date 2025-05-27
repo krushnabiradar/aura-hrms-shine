@@ -17,18 +17,7 @@ const Index = () => {
     // Prevent multiple redirects
     if (hasRedirected) return;
     
-    // Add a timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      if (isLoading) {
-        console.log('Authentication timeout, redirecting to landing');
-        setHasRedirected(true);
-        navigate("/landing", { replace: true });
-      }
-    }, 3000); // 3 second timeout
-    
     if (!isLoading) {
-      clearTimeout(timeoutId);
-      
       if (isAuthenticated && user) {
         if (user.role) {
           console.log('Redirecting user with role:', user.role);
@@ -63,8 +52,6 @@ const Index = () => {
         navigate("/landing", { replace: true });
       }
     }
-
-    return () => clearTimeout(timeoutId);
   }, [isAuthenticated, user, isLoading, navigate, hasRedirected]);
 
   // Show a loading state while checking authentication
@@ -86,7 +73,7 @@ const Index = () => {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         <p className="text-muted-foreground">Redirecting...</p>
       </div>
-    </div>
+    );
   );
 };
 
