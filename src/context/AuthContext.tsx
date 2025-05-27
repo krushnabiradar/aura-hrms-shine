@@ -34,6 +34,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   // Create profile from user metadata with improved error handling
   const createProfileFromMetadata = async (supabaseUser: SupabaseUser) => {
@@ -144,41 +145,76 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     console.log('Setting up auth state listener');
     
+    let isMounted = true;
+    
+    // Add a timeout to ensure we don't stay in loading state forever
+    const loadingTimeout = setTimeout(() => {
+      if (isMounted && !initialized) {
+        console.log('Auth initialization timeout, setting loading to false');
+        setIsLoading(false);
+        setInitialized(true);
+      }
+    }, 5000); // 5 second timeout
+    
     // Set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted) return;
+        
         console.log('Auth state changed:', event, session?.user?.id);
         setSession(session);
         
         if (session?.user) {
           console.log('User logged in, fetching profile...');
           const profile = await fetchUserProfile(session.user.id);
-          setUserFromProfile(profile);
+          if (isMounted) {
+            setUserFromProfile(profile);
+          }
         } else {
           console.log('User logged out');
-          setUser(null);
+          if (isMounted) {
+            setUser(null);
+          }
         }
         
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+          setInitialized(true);
+          clearTimeout(loadingTimeout);
+        }
       }
     );
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
+      
       console.log('Initial session check:', session?.user?.id);
       setSession(session);
       
       if (session?.user) {
         fetchUserProfile(session.user.id).then(profile => {
-          setUserFromProfile(profile);
-          setIsLoading(false);
+          if (isMounted) {
+            setUserFromProfile(profile);
+            setIsLoading(false);
+            setInitialized(true);
+            clearTimeout(loadingTimeout);
+          }
         });
       } else {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+          setInitialized(true);
+          clearTimeout(loadingTimeout);
+        }
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      clearTimeout(loadingTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signup = async (email: string, password: string, userData?: { first_name?: string; last_name?: string; role?: UserRole; tenant_id?: string }) => {
