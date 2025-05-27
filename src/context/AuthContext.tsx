@@ -151,12 +151,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Get IP address (simplified for demo)
       const ipAddress = '127.0.0.1'; // In production, get from server
 
-      const { error } = await supabase.rpc('create_user_session', {
-        p_session_token: sessionToken,
-        p_expires_at: expiresAt,
-        p_ip_address: ipAddress,
-        p_user_agent: userAgent
-      });
+      const { error } = await supabase
+        .from('user_sessions')
+        .insert({
+          user_id: session.user.id,
+          session_token: sessionToken,
+          expires_at: expiresAt,
+          ip_address: ipAddress,
+          user_agent: userAgent
+        });
 
       if (error) {
         console.error('Error creating user session:', error);

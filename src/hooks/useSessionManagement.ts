@@ -32,14 +32,22 @@ export const useSessionManagement = () => {
         
       if (expiredError) throw expiredError;
 
-      // Get concurrent session violations
-      const concurrentViolations = activeSessions?.reduce((acc, session) => {
-        const userSessions = activeSessions.filter(s => s.user_id === session.user_id);
-        if (userSessions.length > 3) { // Default limit
-          acc.add(session.user_id);
-        }
+      // Get concurrent session limit from settings
+      const { data: limitSetting } = await supabase
+        .from('security_settings')
+        .select('setting_value')
+        .eq('setting_key', 'session_concurrent_limit')
+        .single();
+        
+      const limit = limitSetting ? parseInt(limitSetting.setting_value as string) : 3;
+
+      // Calculate concurrent session violations
+      const userSessionCounts = activeSessions?.reduce((acc, session) => {
+        acc[session.user_id] = (acc[session.user_id] || 0) + 1;
         return acc;
-      }, new Set()).size || 0;
+      }, {} as Record<string, number>) || {};
+      
+      const concurrentViolations = Object.values(userSessionCounts).filter(count => count > limit).length;
 
       const stats = {
         activeSessions: activeSessions?.length || 0,
@@ -64,12 +72,44 @@ export const useSessionManagement = () => {
       userAgent?: string;
     }) => {
       console.log('Creating user session...');
-      const { data, error } = await supabase.rpc('create_user_session', {
-        p_session_token: sessionToken,
-        p_expires_at: expiresAt,
-        p_ip_address: ipAddress || null,
-        p_user_agent: userAgent || null
-      });
+      
+      // Get concurrent session limit
+      const { data: limitSetting } = await supabase
+        .from('security_settings')
+        .select('setting_value')
+        .eq('setting_key', 'session_concurrent_limit')
+        .single();
+        
+      const limit = limitSetting ? parseInt(limitSetting.setting_value as string) : 3;
+      
+      // Count current active sessions for user
+      const { data: currentSessions } = await supabase
+        .from('user_sessions')
+        .select('id, last_activity')
+        .eq('user_id', user?.id)
+        .eq('is_active', true)
+        .order('last_activity', { ascending: true });
+        
+      // If limit exceeded, deactivate oldest session
+      if (currentSessions && currentSessions.length >= limit) {
+        await supabase
+          .from('user_sessions')
+          .update({ is_active: false })
+          .eq('id', currentSessions[0].id);
+      }
+      
+      // Create new session
+      const { data, error } = await supabase
+        .from('user_sessions')
+        .insert({
+          user_id: user?.id!,
+          session_token: sessionToken,
+          expires_at: expiresAt,
+          ip_address: ipAddress || null,
+          user_agent: userAgent || null
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error('Error creating session:', error);
