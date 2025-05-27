@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Building, Briefcase, Users, Activity, CreditCard, Database, BarChart3 } from "lucide-react";
@@ -14,14 +15,17 @@ import { toast } from "@/components/ui/sonner";
 import TenantManagementPage from "./TenantManagementPage";
 import UserManagementPage from "./UserManagementPage";
 import BillingSubscriptionPage from "./BillingSubscriptionPage";
-
-// Import the new Phase 4 components
-import { NotificationPreferences } from "@/components/notifications/NotificationPreferences";
-import { ReportBuilder } from "@/components/reports/ReportBuilder";
-import { SystemSettings } from "@/components/settings/SystemSettings";
 import SystemLogsPage from "./SystemLogsPage";
 
-// Import the new hooks for real data
+// Import the new pages
+import SecurityManagementPage from "./SecurityManagementPage";
+import AnalyticsPage from "./AnalyticsPage";
+import HelpSupportPage from "./HelpSupportPage";
+
+// Import the existing Phase 4 components
+import { SystemSettings } from "@/components/settings/SystemSettings";
+
+// Import the hooks for real data
 import { useTenants } from "@/hooks/useTenants";
 import { useProfiles } from "@/hooks/useProfiles";
 import { useInvitations } from "@/hooks/useInvitations";
@@ -70,15 +74,15 @@ const SystemAdminDashboard = () => {
       case "/system-admin/billing":
         return <BillingSubscriptionPage />;
       case "/system-admin/security":
-        return <div className="p-8 text-center text-muted-foreground">Security management coming soon...</div>;
+        return <SecurityManagementPage />;
       case "/system-admin/analytics":
-        return <ReportBuilder />;
+        return <AnalyticsPage />;
       case "/system-admin/logs":
         return <SystemLogsPage />;
       case "/system-admin/settings":
         return <SystemSettings />;
       case "/system-admin/help":
-        return <div className="p-8 text-center text-muted-foreground">Help & support coming soon...</div>;
+        return <HelpSupportPage />;
       default:
         return (
           <div className="space-y-8">
