@@ -1,66 +1,133 @@
 
-import { Link, useLocation } from "react-router-dom";
+import React from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
   Users,
   Clock,
   Calendar,
   DollarSign,
-  Briefcase,
-  Settings,
+  UserPlus,
   BarChart3,
   FileText,
-  HelpCircle
+  Settings,
+  HelpCircle,
+  Home,
+  Target,
+  TrendingUp,
+  Smartphone,
+  Key,
+  Shield
 } from "lucide-react";
 
-export function TenantAdminSidebar() {
-  const { pathname } = useLocation();
+const sidebarItems = [
+  {
+    title: "Dashboard",
+    href: "/tenant-admin",
+    icon: Home,
+  },
+  {
+    title: "Employees",
+    href: "/tenant-admin/employees",
+    icon: Users,
+  },
+  {
+    title: "Attendance",
+    href: "/tenant-admin/attendance",
+    icon: Clock,
+  },
+  {
+    title: "Leave Management",
+    href: "/tenant-admin/leave",
+    icon: Calendar,
+  },
+  {
+    title: "Payroll",
+    href: "/tenant-admin/payroll",
+    icon: DollarSign,
+  },
+  {
+    title: "Recruitment",
+    href: "/tenant-admin/recruitment",
+    icon: UserPlus,
+  },
+  {
+    title: "Performance",
+    href: "/tenant-admin/performance",
+    icon: Target,
+  },
+  {
+    title: "Advanced Analytics",
+    href: "/tenant-admin/advanced-analytics",
+    icon: TrendingUp,
+  },
+  {
+    title: "Reports",
+    href: "/tenant-admin/reports",
+    icon: BarChart3,
+  },
+  {
+    title: "Documents",
+    href: "/tenant-admin/documents",
+    icon: FileText,
+  },
+  {
+    title: "Mobile Support",
+    href: "/tenant-admin/mobile-support",
+    icon: Smartphone,
+  },
+  {
+    title: "API Integration",
+    href: "/tenant-admin/api-integration",
+    icon: Key,
+  },
+  {
+    title: "Security",
+    href: "/tenant-admin/security",
+    icon: Shield,
+  },
+  {
+    title: "Settings",
+    href: "/tenant-admin/settings",
+    icon: Settings,
+  },
+  {
+    title: "Help & Support",
+    href: "/tenant-admin/help",
+    icon: HelpCircle,
+  },
+];
 
-  const links = [
-    { href: "/tenant-admin", icon: LayoutDashboard, label: "Dashboard" },
-    { href: "/tenant-admin/employees", icon: Users, label: "Employees" },
-    { href: "/tenant-admin/attendance", icon: Clock, label: "Attendance" },
-    { href: "/tenant-admin/leave", icon: Calendar, label: "Leave Management" },
-    { href: "/tenant-admin/payroll", icon: DollarSign, label: "Payroll" },
-    { href: "/tenant-admin/recruitment", icon: Briefcase, label: "Recruitment" },
-    { href: "/tenant-admin/reports", icon: BarChart3, label: "Reports" },
-    { href: "/tenant-admin/documents", icon: FileText, label: "Documents" },
-    { href: "/tenant-admin/settings", icon: Settings, label: "Settings" },
-    { href: "/tenant-admin/help", icon: HelpCircle, label: "Help & Support" }
-  ];
+export function TenantAdminSidebar() {
+  const location = useLocation();
 
   return (
-    <div className="flex flex-col min-h-full py-4">
-      <div className="px-4 mb-8">
-        <Link to="/tenant-admin" className="flex items-center gap-2">
-          <span className="text-xl font-bold text-accent">Aura</span>
-          <span className="text-xl font-bold">HRMS</span>
-        </Link>
-        <div className="mt-2 text-sm text-muted-foreground">HR Administration</div>
-      </div>
-      
-      <div className="flex-1">
-        <nav className="flex flex-col gap-1 px-2">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              to={link.href}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                pathname === link.href ? "bg-accent/10 text-accent font-medium" : "text-muted-foreground"
-              )}
-            >
-              <link.icon className="h-4 w-4" />
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
-      
-      <div className="px-4 mt-auto pt-6 border-t text-sm text-muted-foreground">
-        <p>Acme Corporation</p>
-        <p>Tenant Admin Panel</p>
+    <div className="pb-12 min-h-screen">
+      <div className="space-y-4 py-4">
+        <div className="px-3 py-2">
+          <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
+            HR Administration
+          </h2>
+          <div className="space-y-1">
+            {sidebarItems.map((item) => (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors",
+                    isActive || location.pathname === item.href
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground"
+                  )
+                }
+              >
+                <item.icon className="mr-2 h-4 w-4" />
+                {item.title}
+              </NavLink>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
