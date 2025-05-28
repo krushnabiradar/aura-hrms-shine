@@ -106,17 +106,50 @@ export const useInvitations = () => {
 
   // Function to validate invitation token
   const validateInvitation = async (token: string) => {
-    console.log('Validating invitation token...');
-    const { data, error } = await supabase
-      .rpc('validate_invitation_token', { token_value: token });
+    try {
+      console.log('Validating invitation token:', token);
+      
+      // First try to get the invitation directly from the table
+      const { data: invitation, error } = await supabase
+        .from('invitations')
+        .select('*')
+        .eq('token', token)
+        .maybeSingle();
 
-    if (error) {
+      if (error) {
+        console.error('Error fetching invitation:', error);
+        throw new Error('Failed to validate invitation');
+      }
+
+      if (!invitation) {
+        console.log('No invitation found for token');
+        return { is_valid: false, message: 'Invitation not found' };
+      }
+
+      // Check if invitation has expired
+      const now = new Date();
+      const expiresAt = new Date(invitation.expires_at);
+      
+      if (now > expiresAt) {
+        console.log('Invitation has expired');
+        return { is_valid: false, message: 'Invitation has expired' };
+      }
+
+      // Check if invitation has already been accepted
+      if (invitation.accepted_at) {
+        console.log('Invitation has already been accepted');
+        return { is_valid: false, message: 'Invitation has already been used' };
+      }
+
+      console.log('Invitation is valid:', invitation);
+      return { 
+        is_valid: true, 
+        ...invitation 
+      };
+    } catch (error) {
       console.error('Error validating invitation:', error);
       throw error;
     }
-
-    console.log('Invitation validation result:', data);
-    return data?.[0] || null;
   };
 
   // Function to accept invitation during signup

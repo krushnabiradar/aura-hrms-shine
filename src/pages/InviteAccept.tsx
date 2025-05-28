@@ -32,6 +32,7 @@ const InviteAccept = () => {
 
   useEffect(() => {
     if (!token) {
+      console.log('No token provided');
       setError('Invalid invitation link');
       setIsValidating(false);
       return;
@@ -39,22 +40,34 @@ const InviteAccept = () => {
 
     const validateToken = async () => {
       try {
+        console.log('Starting token validation...');
+        setIsValidating(true);
+        setError('');
+        
         const result = await validateInvitation(token);
+        console.log('Validation result:', result);
+        
         if (result && result.is_valid) {
           setInvitation(result);
           setEmail(result.email);
           setStep('signup');
         } else {
-          setError('This invitation is invalid or has expired');
+          setError(result?.message || 'This invitation is invalid or has expired');
         }
       } catch (err: any) {
-        setError('Failed to validate invitation');
+        console.error('Validation error:', err);
+        setError('Failed to validate invitation. Please try again.');
       } finally {
         setIsValidating(false);
       }
     };
 
-    validateToken();
+    // Add a small delay to prevent immediate execution
+    const timeoutId = setTimeout(() => {
+      validateToken();
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
   }, [token, validateInvitation]);
 
   // Redirect if already authenticated
@@ -103,8 +116,9 @@ const InviteAccept = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">
-          <CardContent className="flex items-center justify-center py-8">
+          <CardContent className="flex flex-col items-center justify-center py-8 space-y-4">
             <Loader2 className="h-8 w-8 animate-spin" />
+            <p className="text-muted-foreground">Validating invitation...</p>
           </CardContent>
         </Card>
       </div>
