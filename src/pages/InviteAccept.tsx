@@ -15,7 +15,7 @@ const InviteAccept = () => {
   const navigate = useNavigate();
   const token = searchParams.get('token');
   
-  const { validateInvitation } = useInvitations();
+  const { validateInvitation, markInvitationAccepted } = useInvitations();
   const { signup, login, isAuthenticated } = useAuth();
   
   const [invitation, setInvitation] = useState<any>(null);
@@ -102,10 +102,16 @@ const InviteAccept = () => {
         tenant_id: invitation.tenant_id
       });
 
-      console.log('Signup successful, user should be authenticated now');
+      console.log('Signup successful, now marking invitation as accepted...');
       
-      // The signup process will authenticate the user, and the useEffect above will redirect them
-      // But let's also handle the invitation acceptance here
+      // Mark the invitation as accepted
+      try {
+        await markInvitationAccepted(token!);
+        console.log('Invitation marked as accepted successfully');
+      } catch (inviteError) {
+        console.error('Error marking invitation as accepted:', inviteError);
+        // Don't fail the whole process if invitation marking fails
+      }
       
       // Small delay to ensure auth state is updated
       setTimeout(() => {
