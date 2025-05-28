@@ -109,6 +109,28 @@ export const useInvitations = () => {
     try {
       console.log('Validating invitation token:', token);
       
+      // First, let's see what invitations exist in the database
+      console.log('Fetching all invitations for debugging...');
+      const { data: allInvitations, error: debugError } = await supabase
+        .from('invitations')
+        .select('token, email, created_at, expires_at, accepted_at')
+        .limit(10);
+      
+      if (debugError) {
+        console.error('Debug query error:', debugError);
+      } else {
+        console.log('All invitations in database:', allInvitations);
+        allInvitations?.forEach((inv, index) => {
+          console.log(`Invitation ${index + 1}:`, {
+            token: inv.token,
+            tokenLength: inv.token?.length,
+            email: inv.email,
+            expires_at: inv.expires_at,
+            accepted_at: inv.accepted_at
+          });
+        });
+      }
+      
       // Create multiple token variants to handle URL encoding issues
       const tokensToTry = [
         token,                              // Original token
@@ -123,10 +145,12 @@ export const useInvitations = () => {
       // Remove duplicates
       const uniqueTokens = [...new Set(tokensToTry)];
       
+      console.log('Token variants to try:', uniqueTokens);
+      
       let invitation = null;
       
       for (const tokenVariant of uniqueTokens) {
-        console.log('Trying token variant:', tokenVariant);
+        console.log('Trying token variant:', tokenVariant, 'Length:', tokenVariant.length);
         
         const { data, error } = await supabase
           .from('invitations')
@@ -143,6 +167,8 @@ export const useInvitations = () => {
           invitation = data;
           console.log('Found invitation with token variant:', tokenVariant);
           break;
+        } else {
+          console.log('No invitation found for variant:', tokenVariant);
         }
       }
 
