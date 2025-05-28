@@ -109,8 +109,19 @@ export const useInvitations = () => {
     try {
       console.log('Validating invitation token:', token);
       
-      // Clean the token - remove any whitespace and decode if needed
-      const cleanToken = token.trim();
+      // Properly handle URL encoding - replace spaces with + and decode
+      let cleanToken = token.trim();
+      // Replace spaces that may have been converted from + during URL parsing
+      cleanToken = cleanToken.replace(/ /g, '+');
+      // Also try URL decoding in case it's double-encoded
+      try {
+        const decodedToken = decodeURIComponent(cleanToken);
+        console.log('Decoded token:', decodedToken);
+        cleanToken = decodedToken;
+      } catch (e) {
+        console.log('Token does not need URL decoding');
+      }
+      
       console.log('Cleaned token:', cleanToken);
       
       // First try using the database function
@@ -137,43 +148,56 @@ export const useInvitations = () => {
         }
       }
 
-      // Fallback: Direct query to invitations table
+      // Fallback: Direct query to invitations table with multiple token variations
       console.log('Falling back to direct invitation query...');
-      const { data: directData, error: directError } = await supabase
-        .from('invitations')
-        .select('*')
-        .eq('token', cleanToken)
-        .maybeSingle();
+      
+      // Try multiple variations of the token
+      const tokenVariations = [
+        cleanToken,
+        token.trim(), // Original token
+        token.replace(/ /g, '+'), // Replace spaces with +
+        decodeURIComponent(token.replace(/\+/g, ' ')), // Decode URL encoding
+      ].filter((t, index, arr) => arr.indexOf(t) === index); // Remove duplicates
+      
+      console.log('Trying token variations:', tokenVariations);
+      
+      for (const tokenVariation of tokenVariations) {
+        const { data: directData, error: directError } = await supabase
+          .from('invitations')
+          .select('*')
+          .eq('token', tokenVariation)
+          .maybeSingle();
 
-      if (directError) {
-        console.error('Direct query error:', directError);
-        return { is_valid: false, message: 'Failed to validate invitation' };
+        if (directError) {
+          console.error('Direct query error for token', tokenVariation, ':', directError);
+          continue;
+        }
+
+        if (directData) {
+          console.log('Found invitation with token variation:', tokenVariation, directData);
+
+          // Check if invitation is valid
+          const now = new Date();
+          const expiresAt = new Date(directData.expires_at);
+          const isValid = expiresAt > now && !directData.accepted_at;
+
+          if (!isValid) {
+            console.log('Invitation is not valid - expired or already accepted');
+            return { is_valid: false, message: 'Invitation has expired or has already been used' };
+          }
+
+          return { 
+            is_valid: true, 
+            id: directData.id,
+            email: directData.email,
+            tenant_id: directData.tenant_id,
+            role: directData.role
+          };
+        }
       }
 
-      if (!directData) {
-        console.log('No invitation found for token');
-        return { is_valid: false, message: 'Invitation not found' };
-      }
-
-      console.log('Direct query result:', directData);
-
-      // Check if invitation is valid
-      const now = new Date();
-      const expiresAt = new Date(directData.expires_at);
-      const isValid = expiresAt > now && !directData.accepted_at;
-
-      if (!isValid) {
-        console.log('Invitation is not valid - expired or already accepted');
-        return { is_valid: false, message: 'Invitation has expired or has already been used' };
-      }
-
-      return { 
-        is_valid: true, 
-        id: directData.id,
-        email: directData.email,
-        tenant_id: directData.tenant_id,
-        role: directData.role
-      };
+      console.log('No invitation found for any token variation');
+      return { is_valid: false, message: 'Invitation not found' };
     } catch (error) {
       console.error('Error validating invitation:', error);
       return { is_valid: false, message: 'Failed to validate invitation' };
@@ -185,7 +209,16 @@ export const useInvitations = () => {
     try {
       console.log('Marking invitation as accepted...');
       
-      const cleanToken = token.trim();
+      // Use the same token cleaning logic as validation
+      let cleanToken = token.trim();
+      cleanToken = cleanToken.replace(/ /g, '+');
+      try {
+        const decodedToken = decodeURIComponent(cleanToken);
+        cleanToken = decodedToken;
+      } catch (e) {
+        // Token doesn't need decoding
+      }
+      
       const currentUser = (await supabase.auth.getUser()).data.user;
       
       if (!currentUser) {
@@ -212,24 +245,31 @@ export const useInvitations = () => {
       } catch (functionError) {
         console.error('Function failed, trying direct update:', functionError);
         
-        // Fallback: Direct update
-        const { data, error } = await supabase
-          .from('invitations')
-          .update({ 
-            accepted_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('token', cleanToken)
-          .select()
-          .single();
+        // Fallback: Try multiple token variations for direct update
+        const tokenVariations = [
+          cleanToken,
+          token.trim(),
+          token.replace(/ /g, '+'),
+        ].filter((t, index, arr) => arr.indexOf(t) === index);
+        
+        for (const tokenVariation of tokenVariations) {
+          const { data, error } = await supabase
+            .from('invitations')
+            .update({ 
+              accepted_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('token', tokenVariation)
+            .select()
+            .maybeSingle();
 
-        if (error) {
-          console.error('Direct update error:', error);
-          throw error;
+          if (!error && data) {
+            console.log('Invitation marked as accepted via direct update:', data);
+            return data;
+          }
         }
-
-        console.log('Invitation marked as accepted via direct update:', data);
-        return data;
+        
+        throw new Error('Could not mark invitation as accepted');
       }
     } catch (error) {
       console.error('Error in markInvitationAccepted:', error);
