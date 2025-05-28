@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,6 +34,8 @@ const handler = async (req: Request): Promise<Response> => {
     if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
       throw new Error('SMTP configuration is incomplete');
     }
+
+    console.log('SMTP Config:', { smtpHost, smtpPort, smtpUser: smtpUser.substring(0, 5) + '***', smtpSecure });
 
     // Create invitation URL
     const inviteUrl = `${req.headers.get('origin')}/invite-accept?token=${token}`;
@@ -100,24 +101,19 @@ const handler = async (req: Request): Promise<Response> => {
       Aura HRMS Team
     `;
 
-    // Send email using SMTP
-    const emailData = {
+    // Send email using native SMTP
+    const response = await sendSMTPEmail({
       from: `${fromName} <${fromEmail}>`,
       to: email,
       subject: emailSubject,
       text: emailText,
       html: emailHtml,
-    };
-
-    // Use a simple SMTP implementation
-    const response = await sendSMTPEmail(emailData, {
+    }, {
       host: smtpHost,
       port: smtpPort,
       secure: smtpSecure,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
+      user: smtpUser,
+      pass: smtpPass,
     });
 
     console.log('Email sent successfully:', response);
@@ -145,42 +141,102 @@ const handler = async (req: Request): Promise<Response> => {
 };
 
 async function sendSMTPEmail(emailData: any, smtpConfig: any) {
-  // For this implementation, we'll use a simple HTTP-based email service
-  // that works with SMTP credentials. In a production environment,
-  // you might want to use a more robust SMTP client.
-  
-  const emailPayload = {
-    smtp: smtpConfig,
-    email: emailData,
-  };
+  try {
+    console.log('Attempting to send email via SMTP...');
+    
+    // Create SMTP connection
+    const conn = await Deno.connect({
+      hostname: smtpConfig.host,
+      port: smtpConfig.port,
+    });
 
-  // This is a simplified approach - in production you'd use a proper SMTP library
-  // For now, we'll use Deno's built-in fetch with a service that handles SMTP
-  const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      service_id: 'gmail',
-      template_id: 'template_1',
-      user_id: smtpConfig.auth.user,
-      template_params: {
-        to_email: emailData.to,
-        from_name: emailData.from,
-        subject: emailData.subject,
-        message_html: emailData.html,
-        message: emailData.text,
-      },
-      accessToken: smtpConfig.auth.pass,
-    }),
-  });
+    // For SSL/TLS connection
+    const tlsConn = smtpConfig.secure 
+      ? await Deno.startTls(conn, { hostname: smtpConfig.host })
+      : conn;
 
-  if (!response.ok) {
-    throw new Error(`SMTP send failed: ${response.statusText}`);
+    // SMTP commands
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    // Helper function to send command and read response
+    async function sendCommand(command: string): Promise<string> {
+      console.log('SMTP >', command.replace(/AUTH PLAIN.*/, 'AUTH PLAIN [credentials hidden]'));
+      await tlsConn.write(encoder.encode(command + '\r\n'));
+      
+      const buffer = new Uint8Array(1024);
+      const bytesRead = await tlsConn.read(buffer);
+      const response = decoder.decode(buffer.subarray(0, bytesRead || 0));
+      console.log('SMTP <', response.trim());
+      
+      if (!response.startsWith('2') && !response.startsWith('3')) {
+        throw new Error(`SMTP Error: ${response.trim()}`);
+      }
+      
+      return response;
+    }
+
+    // SMTP conversation
+    await sendCommand('EHLO localhost');
+    
+    if (!smtpConfig.secure) {
+      await sendCommand('STARTTLS');
+      // Upgrade to TLS
+      const tlsUpgraded = await Deno.startTls(tlsConn, { hostname: smtpConfig.host });
+      await sendCommand('EHLO localhost');
+    }
+
+    // Authentication
+    const authString = btoa(`\0${smtpConfig.user}\0${smtpConfig.pass}`);
+    await sendCommand(`AUTH PLAIN ${authString}`);
+
+    // Send email
+    await sendCommand(`MAIL FROM:<${smtpConfig.user}>`);
+    await sendCommand(`RCPT TO:<${emailData.to}>`);
+    await sendCommand('DATA');
+
+    // Email headers and body
+    const emailContent = [
+      `From: ${emailData.from}`,
+      `To: ${emailData.to}`,
+      `Subject: ${emailData.subject}`,
+      'MIME-Version: 1.0',
+      'Content-Type: multipart/alternative; boundary="boundary123"',
+      '',
+      '--boundary123',
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      emailData.text,
+      '',
+      '--boundary123',
+      'Content-Type: text/html; charset=utf-8',
+      '',
+      emailData.html,
+      '',
+      '--boundary123--',
+      '.',
+    ].join('\r\n');
+
+    await tlsConn.write(encoder.encode(emailContent + '\r\n'));
+    
+    const finalBuffer = new Uint8Array(1024);
+    const finalBytesRead = await tlsConn.read(finalBuffer);
+    const finalResponse = decoder.decode(finalBuffer.subarray(0, finalBytesRead || 0));
+    console.log('SMTP <', finalResponse.trim());
+
+    await sendCommand('QUIT');
+    tlsConn.close();
+
+    if (!finalResponse.startsWith('2')) {
+      throw new Error(`Email send failed: ${finalResponse.trim()}`);
+    }
+
+    return { success: true, messageId: 'smtp-sent' };
+
+  } catch (error) {
+    console.error('SMTP Error:', error);
+    throw new Error(`SMTP send failed: ${error.message}`);
   }
-
-  return response.json();
 }
 
 serve(handler);
