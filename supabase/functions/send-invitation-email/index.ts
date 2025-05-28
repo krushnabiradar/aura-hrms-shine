@@ -160,7 +160,7 @@ async function sendSMTPEmail(emailData: any, smtpConfig: any) {
     const decoder = new TextDecoder();
 
     // Helper function to send command and read response
-    async function sendCommand(command: string): Promise<string> {
+    async function sendCommand(command: string, expectCode?: string): Promise<string> {
       console.log('SMTP >', command.replace(/AUTH PLAIN.*/, 'AUTH PLAIN [credentials hidden]'));
       await tlsConn.write(encoder.encode(command + '\r\n'));
       
@@ -169,7 +169,13 @@ async function sendSMTPEmail(emailData: any, smtpConfig: any) {
       const response = decoder.decode(buffer.subarray(0, bytesRead || 0));
       console.log('SMTP <', response.trim());
       
-      if (!response.startsWith('2') && !response.startsWith('3')) {
+      // Check if response starts with expected code or 2xx/3xx for success
+      const responseCode = response.substring(0, 3);
+      if (expectCode) {
+        if (!response.startsWith(expectCode)) {
+          throw new Error(`SMTP Error: Expected ${expectCode}, got ${response.trim()}`);
+        }
+      } else if (!responseCode.startsWith('2') && !responseCode.startsWith('3')) {
         throw new Error(`SMTP Error: ${response.trim()}`);
       }
       
@@ -188,14 +194,14 @@ async function sendSMTPEmail(emailData: any, smtpConfig: any) {
 
     // Authentication
     const authString = btoa(`\0${smtpConfig.user}\0${smtpConfig.pass}`);
-    await sendCommand(`AUTH PLAIN ${authString}`);
+    await sendCommand(`AUTH PLAIN ${authString}`, '235');
 
     // Send email
-    await sendCommand(`MAIL FROM:<${smtpConfig.user}>`);
-    await sendCommand(`RCPT TO:<${emailData.to}>`);
-    await sendCommand('DATA');
+    await sendCommand(`MAIL FROM:<${smtpConfig.user}>`, '250');
+    await sendCommand(`RCPT TO:<${emailData.to}>`, '250');
+    await sendCommand('DATA', '354');
 
-    // Email headers and body
+    // Email headers and body - send as one block
     const emailContent = [
       `From: ${emailData.from}`,
       `To: ${emailData.to}`,
@@ -217,19 +223,22 @@ async function sendSMTPEmail(emailData: any, smtpConfig: any) {
       '.',
     ].join('\r\n');
 
+    console.log('SMTP > [EMAIL CONTENT]');
     await tlsConn.write(encoder.encode(emailContent + '\r\n'));
     
+    // Read final response
     const finalBuffer = new Uint8Array(1024);
     const finalBytesRead = await tlsConn.read(finalBuffer);
     const finalResponse = decoder.decode(finalBuffer.subarray(0, finalBytesRead || 0));
     console.log('SMTP <', finalResponse.trim());
 
-    await sendCommand('QUIT');
-    tlsConn.close();
-
-    if (!finalResponse.startsWith('2')) {
-      throw new Error(`Email send failed: ${finalResponse.trim()}`);
+    // Check for successful delivery
+    if (!finalResponse.startsWith('250')) {
+      throw new Error(`Email delivery failed: ${finalResponse.trim()}`);
     }
+
+    await sendCommand('QUIT', '221');
+    tlsConn.close();
 
     return { success: true, messageId: 'smtp-sent' };
 
