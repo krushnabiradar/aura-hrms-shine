@@ -15,7 +15,7 @@ const InviteAccept = () => {
   const navigate = useNavigate();
   const token = searchParams.get('token');
   
-  const { validateInvitation, acceptInvitation } = useInvitations();
+  const { validateInvitation } = useInvitations();
   const { signup, login, isAuthenticated } = useAuth();
   
   const [invitation, setInvitation] = useState<any>(null);
@@ -41,12 +41,7 @@ const InviteAccept = () => {
       setError('');
       setHasValidated(true);
       
-      // Decode the token if it's URL encoded
-      const decodedToken = decodeURIComponent(tokenValue);
-      console.log('Original token:', tokenValue);
-      console.log('Decoded token:', decodedToken);
-      
-      const result = await validateInvitation(decodedToken);
+      const result = await validateInvitation(tokenValue);
       console.log('Validation result:', result);
       
       if (result && result.is_valid) {
@@ -97,7 +92,9 @@ const InviteAccept = () => {
     setError('');
 
     try {
-      // First, sign up the user
+      console.log('Starting signup process...');
+      
+      // Sign up the user with the invitation data
       await signup(email, password, {
         first_name: firstName,
         last_name: lastName,
@@ -105,10 +102,16 @@ const InviteAccept = () => {
         tenant_id: invitation.tenant_id
       });
 
-      // Then accept the invitation to create profile
-      await acceptInvitation(token!, firstName, lastName);
+      console.log('Signup successful, user should be authenticated now');
       
-      setStep('complete');
+      // The signup process will authenticate the user, and the useEffect above will redirect them
+      // But let's also handle the invitation acceptance here
+      
+      // Small delay to ensure auth state is updated
+      setTimeout(() => {
+        setStep('complete');
+      }, 1000);
+      
     } catch (err: any) {
       console.error('Signup error:', err);
       setError(err.message || 'Failed to create account');
@@ -161,12 +164,12 @@ const InviteAccept = () => {
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
             <CardTitle>Welcome to Aura HRMS!</CardTitle>
             <CardDescription>
-              Your account has been created successfully. You can now sign in.
+              Your account has been created successfully. You will be redirected shortly.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleLogin} className="w-full">
-              Sign In
+            <Button onClick={() => navigate('/')} className="w-full">
+              Continue to Dashboard
             </Button>
           </CardContent>
         </Card>

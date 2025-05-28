@@ -146,30 +146,30 @@ export const useInvitations = () => {
     }
   };
 
-  // Function to accept invitation during signup
-  const acceptInvitation = async (token: string, firstName: string, lastName: string) => {
-    console.log('Accepting invitation...');
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    
-    if (!authUser) {
-      throw new Error('User must be authenticated to accept invitation');
-    }
+  // Function to mark invitation as accepted (can be called after signup)
+  const markInvitationAccepted = async (token: string) => {
+    try {
+      console.log('Marking invitation as accepted...');
+      
+      const { data, error } = await supabase
+        .rpc('accept_invitation', {
+          token_value: token,
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          first_name: '',
+          last_name: ''
+        });
 
-    const { data, error } = await supabase
-      .rpc('accept_invitation', {
-        token_value: token,
-        user_id: authUser.id,
-        first_name: firstName,
-        last_name: lastName
-      });
+      if (error) {
+        console.error('Error marking invitation as accepted:', error);
+        throw error;
+      }
 
-    if (error) {
-      console.error('Error accepting invitation:', error);
+      console.log('Invitation marked as accepted successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error in markInvitationAccepted:', error);
       throw error;
     }
-
-    console.log('Invitation accepted successfully:', data);
-    return data;
   };
 
   return {
@@ -179,6 +179,6 @@ export const useInvitations = () => {
     createInvitation: createInvitationMutation.mutate,
     isCreatingInvitation: createInvitationMutation.isPending,
     validateInvitation,
-    acceptInvitation
+    markInvitationAccepted
   };
 };
