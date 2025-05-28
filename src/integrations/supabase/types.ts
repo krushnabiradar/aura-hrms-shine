@@ -164,6 +164,106 @@ export type Database = {
           },
         ]
       }
+      document_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "document_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          access_level: string
+          category_id: string | null
+          created_at: string
+          description: string | null
+          employee_id: string | null
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          is_active: boolean
+          name: string
+          tags: string[] | null
+          tenant_id: string
+          updated_at: string
+          uploaded_by: string
+          version: number
+        }
+        Insert: {
+          access_level?: string
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          employee_id?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          is_active?: boolean
+          name: string
+          tags?: string[] | null
+          tenant_id: string
+          updated_at?: string
+          uploaded_by: string
+          version?: number
+        }
+        Update: {
+          access_level?: string
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          employee_id?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          tags?: string[] | null
+          tenant_id?: string
+          updated_at?: string
+          uploaded_by?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "document_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           created_at: string
@@ -224,6 +324,112 @@ export type Database = {
           },
         ]
       }
+      generated_reports: {
+        Row: {
+          expires_at: string | null
+          file_url: string | null
+          generated_at: string
+          generated_by: string
+          id: string
+          name: string
+          parameters: Json | null
+          status: string
+          template_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          expires_at?: string | null
+          file_url?: string | null
+          generated_at?: string
+          generated_by: string
+          id?: string
+          name: string
+          parameters?: Json | null
+          status?: string
+          template_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          expires_at?: string | null
+          file_url?: string | null
+          generated_at?: string
+          generated_by?: string
+          id?: string
+          name?: string
+          parameters?: Json | null
+          status?: string
+          template_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_reports_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "report_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interviews: {
+        Row: {
+          application_id: string
+          created_at: string
+          duration_minutes: number | null
+          feedback: string | null
+          id: string
+          interview_type: string
+          interviewer_id: string
+          location: string | null
+          meeting_link: string | null
+          rating: number | null
+          scheduled_at: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          duration_minutes?: number | null
+          feedback?: string | null
+          id?: string
+          interview_type?: string
+          interviewer_id: string
+          location?: string | null
+          meeting_link?: string | null
+          rating?: number | null
+          scheduled_at: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          duration_minutes?: number | null
+          feedback?: string | null
+          id?: string
+          interview_type?: string
+          interviewer_id?: string
+          location?: string | null
+          meeting_link?: string | null
+          rating?: number | null
+          scheduled_at?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interviews_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "job_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invitations: {
         Row: {
           accepted_at: string | null
@@ -270,6 +476,125 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      job_applications: {
+        Row: {
+          applicant_email: string
+          applicant_name: string
+          applicant_phone: string | null
+          applied_at: string
+          cover_letter: string | null
+          created_at: string
+          id: string
+          job_posting_id: string
+          notes: string | null
+          resume_url: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          applicant_email: string
+          applicant_name: string
+          applicant_phone?: string | null
+          applied_at?: string
+          cover_letter?: string | null
+          created_at?: string
+          id?: string
+          job_posting_id: string
+          notes?: string | null
+          resume_url?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          applicant_email?: string
+          applicant_name?: string
+          applicant_phone?: string | null
+          applied_at?: string
+          cover_letter?: string | null
+          created_at?: string
+          id?: string
+          job_posting_id?: string
+          notes?: string | null
+          resume_url?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_applications_job_posting_id_fkey"
+            columns: ["job_posting_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_postings: {
+        Row: {
+          created_at: string
+          department: string | null
+          description: string | null
+          employment_type: string
+          expires_at: string | null
+          id: string
+          location: string | null
+          posted_at: string | null
+          posted_by: string
+          requirements: string | null
+          salary_max: number | null
+          salary_min: number | null
+          status: string
+          tenant_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          description?: string | null
+          employment_type?: string
+          expires_at?: string | null
+          id?: string
+          location?: string | null
+          posted_at?: string | null
+          posted_by: string
+          requirements?: string | null
+          salary_max?: number | null
+          salary_min?: number | null
+          status?: string
+          tenant_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          description?: string | null
+          employment_type?: string
+          expires_at?: string | null
+          id?: string
+          location?: string | null
+          posted_at?: string | null
+          posted_by?: string
+          requirements?: string | null
+          salary_max?: number | null
+          salary_min?: number | null
+          status?: string
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       leave_requests: {
         Row: {
@@ -442,6 +767,45 @@ export type Database = {
           },
         ]
       }
+      report_templates: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          report_type: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          report_type: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          report_type?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       security_settings: {
         Row: {
           category: string
@@ -611,6 +975,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tenant_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_system: boolean
+          setting_category: string
+          setting_key: string
+          setting_value: Json
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_system?: boolean
+          setting_category: string
+          setting_key: string
+          setting_value: Json
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_system?: boolean
+          setting_category?: string
+          setting_key?: string
+          setting_value?: Json
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       tenants: {
         Row: {
