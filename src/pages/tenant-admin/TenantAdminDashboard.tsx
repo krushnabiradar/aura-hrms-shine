@@ -15,11 +15,55 @@ import ReportsPage from "./ReportsPage";
 import DocumentsManagementPage from "./DocumentsManagementPage";
 import SettingsPage from "./SettingsPage";
 
-// Import dashboard cards
+// Import dashboard cards and hooks
+import { DashboardCard } from "@/components/dashboard/DashboardCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Clock, Calendar, DollarSign, Briefcase, BarChart3, FileText, Settings } from "lucide-react";
+import { Users, Clock, Calendar, DollarSign, Briefcase, BarChart3, FileText } from "lucide-react";
+import { useTenantDashboard } from "@/hooks/useTenantDashboard";
 
 function TenantAdminOverview() {
+  const { dashboardData, isLoading, error } = useTenantDashboard();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+          <p className="text-muted-foreground">Welcome to your HR administration dashboard</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="space-y-0 pb-2">
+                <div className="h-4 bg-muted rounded w-3/4"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 bg-muted rounded w-1/2 mb-2"></div>
+                <div className="h-3 bg-muted rounded w-full"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+          <p className="text-muted-foreground">Welcome to your HR administration dashboard</p>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-destructive">Error loading dashboard data: {error.message}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -28,95 +72,63 @@ function TenantAdminOverview() {
       </div>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">245</div>
-            <p className="text-xs text-muted-foreground">+12 from last month</p>
-          </CardContent>
-        </Card>
+        <DashboardCard
+          title="Total Employees"
+          value={dashboardData?.totalEmployees || 0}
+          description={`${dashboardData?.activeEmployees || 0} active employees`}
+          icon={Users}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Present Today</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">198</div>
-            <p className="text-xs text-muted-foreground">80.8% attendance rate</p>
-          </CardContent>
-        </Card>
+        <DashboardCard
+          title="Present Today"
+          value={dashboardData?.presentToday || 0}
+          description={`${dashboardData?.attendanceRate || 0}% attendance rate`}
+          icon={Clock}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Leaves</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">Awaiting approval</p>
-          </CardContent>
-        </Card>
+        <DashboardCard
+          title="Pending Leaves"
+          value={dashboardData?.pendingLeavesCount || 0}
+          description="Awaiting approval"
+          icon={Calendar}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Payroll</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">$148.2K</div>
-            <p className="text-xs text-muted-foreground">+4.2% from last month</p>
-          </CardContent>
-        </Card>
+        <DashboardCard
+          title="Monthly Payroll"
+          value={`$${(dashboardData?.monthlyPayrollTotal || 0).toLocaleString()}`}
+          description="Current month total"
+          icon={DollarSign}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Open Positions</CardTitle>
-            <Briefcase className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">8</div>
-            <p className="text-xs text-muted-foreground">3 new this week</p>
-          </CardContent>
-        </Card>
+        <DashboardCard
+          title="Open Positions"
+          value={dashboardData?.openJobsCount || 0}
+          description="Active job postings"
+          icon={Briefcase}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Applications</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">34</div>
-            <p className="text-xs text-muted-foreground">12 pending review</p>
-          </CardContent>
-        </Card>
+        <DashboardCard
+          title="Applications"
+          value={dashboardData?.totalApplications || 0}
+          description={`${dashboardData?.pendingApplications || 0} pending review`}
+          icon={Users}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Reports Generated</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">16</div>
-            <p className="text-xs text-muted-foreground">This month</p>
-          </CardContent>
-        </Card>
+        <DashboardCard
+          title="Reports Generated"
+          value="0"
+          description="This month"
+          icon={BarChart3}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Documents</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">127</div>
-            <p className="text-xs text-muted-foreground">5 uploaded today</p>
-          </CardContent>
-        </Card>
+        <DashboardCard
+          title="Documents"
+          value={dashboardData?.documentsCount || 0}
+          description="Total documents"
+          icon={FileText}
+        />
       </div>
     </div>
   );
