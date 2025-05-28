@@ -104,98 +104,41 @@ export const useInvitations = () => {
     }
   });
 
-  // Function to validate invitation token
+  // Function to validate invitation token using the database function
   const validateInvitation = async (token: string) => {
     try {
-      console.log('Validating invitation token:', token);
+      console.log('Validating invitation token using database function:', token);
       
-      // First, let's see what invitations exist in the database
-      console.log('Fetching all invitations for debugging...');
-      const { data: allInvitations, error: debugError } = await supabase
-        .from('invitations')
-        .select('token, email, created_at, expires_at, accepted_at')
-        .limit(10);
-      
-      if (debugError) {
-        console.error('Debug query error:', debugError);
-      } else {
-        console.log('All invitations in database:', allInvitations);
-        allInvitations?.forEach((inv, index) => {
-          console.log(`Invitation ${index + 1}:`, {
-            token: inv.token,
-            tokenLength: inv.token?.length,
-            email: inv.email,
-            expires_at: inv.expires_at,
-            accepted_at: inv.accepted_at
-          });
-        });
-      }
-      
-      // Create multiple token variants to handle URL encoding issues
-      const tokensToTry = [
-        token,                              // Original token
-        decodeURIComponent(token),          // URL decoded
-        token.replace(/\s/g, '+'),          // Replace spaces with +
-        decodeURIComponent(token).replace(/\s/g, '+'), // URL decoded and spaces to +
-        token.replace(/\+/g, ' '),          // Replace + with spaces
-        token.replace(/%20/g, '+'),         // Replace %20 with +
-        token.replace(/%2B/g, '+'),         // Replace %2B with +
-      ];
-      
-      // Remove duplicates
-      const uniqueTokens = [...new Set(tokensToTry)];
-      
-      console.log('Token variants to try:', uniqueTokens);
-      
-      let invitation = null;
-      
-      for (const tokenVariant of uniqueTokens) {
-        console.log('Trying token variant:', tokenVariant, 'Length:', tokenVariant.length);
-        
-        const { data, error } = await supabase
-          .from('invitations')
-          .select('*')
-          .eq('token', tokenVariant)
-          .maybeSingle();
+      // Use the existing database function that bypasses RLS
+      const { data, error } = await supabase
+        .rpc('validate_invitation_token', { token_value: token });
 
-        if (error) {
-          console.error('Error fetching invitation for variant:', tokenVariant, error);
-          continue; // Try next variant
-        }
-
-        if (data) {
-          invitation = data;
-          console.log('Found invitation with token variant:', tokenVariant);
-          break;
-        } else {
-          console.log('No invitation found for variant:', tokenVariant);
-        }
+      if (error) {
+        console.error('Error validating invitation:', error);
+        return { is_valid: false, message: 'Failed to validate invitation' };
       }
 
-      if (!invitation) {
-        console.log('No invitation found for any token variant');
+      console.log('Database function result:', data);
+
+      if (!data || data.length === 0) {
+        console.log('No invitation found for token');
         return { is_valid: false, message: 'Invitation not found or has expired' };
       }
 
-      // Check if invitation has expired
-      const now = new Date();
-      const expiresAt = new Date(invitation.expires_at);
+      const invitation = data[0];
       
-      if (now > expiresAt) {
-        console.log('Invitation has expired');
-        return { is_valid: false, message: 'Invitation has expired' };
-      }
-
-      // Check if invitation has already been accepted
-      if (invitation.accepted_at) {
-        console.log('Invitation has already been accepted');
-        return { is_valid: false, message: 'Invitation has already been used' };
+      if (!invitation.is_valid) {
+        console.log('Invitation is not valid');
+        return { is_valid: false, message: 'Invitation has expired or has already been used' };
       }
 
       console.log('Invitation is valid:', invitation);
       return { 
         is_valid: true, 
-        ...invitation 
+        id: invitation.invitation_id,
+        email: invitation.email,
+        tenant_id: invitation.tenant_id,
+        role: invitation.role
       };
     } catch (error) {
       console.error('Error validating invitation:', error);
@@ -212,12 +155,9 @@ export const useInvitations = () => {
       throw new Error('User must be authenticated to accept invitation');
     }
 
-    // Use the same token normalization logic as validation
-    const normalizedToken = token.replace(/\s/g, '+');
-
     const { data, error } = await supabase
       .rpc('accept_invitation', {
-        token_value: normalizedToken,
+        token_value: token,
         user_id: authUser.id,
         first_name: firstName,
         last_name: lastName
