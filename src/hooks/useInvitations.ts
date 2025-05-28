@@ -66,6 +66,37 @@ export const useInvitations = () => {
       }
 
       console.log('Invitation created successfully:', data);
+      
+      // Send invitation email
+      try {
+        // Get tenant and inviter information
+        const { data: tenantData } = await supabase
+          .from('tenants')
+          .select('name')
+          .eq('id', invitationData.tenant_id)
+          .single();
+
+        const inviterName = user?.first_name && user?.last_name 
+          ? `${user.first_name} ${user.last_name}`
+          : user?.email || 'Administrator';
+
+        await supabase.functions.invoke('send-invitation-email', {
+          body: {
+            email: data.email,
+            token: data.token,
+            role: data.role,
+            tenantName: tenantData?.name || 'Your Organization',
+            inviterName: inviterName,
+          },
+        });
+
+        console.log('Invitation email sent successfully');
+      } catch (emailError) {
+        console.error('Failed to send invitation email:', emailError);
+        // Don't throw error here - invitation was created successfully
+        // Just log the email sending failure
+      }
+
       return data as Invitation;
     },
     onSuccess: () => {
