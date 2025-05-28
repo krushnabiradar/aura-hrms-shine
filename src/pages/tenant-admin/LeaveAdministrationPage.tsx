@@ -8,87 +8,81 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "@/components/ui/sonner";
 import { CalendarDays, Clock, CheckCircle, XCircle, AlertCircle, FileText } from "lucide-react";
-
-const mockLeaveRequests = [
-  {
-    id: "leave-001",
-    employee: "Alice Johnson",
-    type: "Annual Leave",
-    startDate: "2024-02-01",
-    endDate: "2024-02-05",
-    days: 5,
-    status: "Pending",
-    reason: "Family vacation",
-    appliedDate: "2024-01-15"
-  },
-  {
-    id: "leave-002", 
-    employee: "Bob Smith",
-    type: "Sick Leave",
-    startDate: "2024-01-22",
-    endDate: "2024-01-22",
-    days: 1,
-    status: "Approved",
-    reason: "Medical appointment",
-    appliedDate: "2024-01-20"
-  },
-  {
-    id: "leave-003",
-    employee: "Carol White", 
-    type: "Maternity Leave",
-    startDate: "2024-03-01",
-    endDate: "2024-05-30",
-    days: 90,
-    status: "Approved",
-    reason: "Maternity leave",
-    appliedDate: "2024-01-10"
-  },
-  {
-    id: "leave-004",
-    employee: "Dave Miller",
-    type: "Annual Leave",
-    startDate: "2024-01-29",
-    endDate: "2024-01-31",
-    days: 3,
-    status: "Rejected",
-    reason: "Personal reasons",
-    appliedDate: "2024-01-25"
-  }
-];
-
-const mockLeaveBalances = [
-  { employee: "Alice Johnson", annualLeave: 15, sickLeave: 10, personalLeave: 5 },
-  { employee: "Bob Smith", annualLeave: 18, sickLeave: 12, personalLeave: 3 },
-  { employee: "Carol White", annualLeave: 20, sickLeave: 8, personalLeave: 7 },
-  { employee: "Dave Miller", annualLeave: 12, sickLeave: 15, personalLeave: 4 }
-];
-
-const mockLeavePolicies = [
-  { type: "Annual Leave", entitlement: 20, carryover: 5, maxConsecutive: 15 },
-  { type: "Sick Leave", entitlement: 15, carryover: 0, maxConsecutive: 30 },
-  { type: "Personal Leave", entitlement: 5, carryover: 2, maxConsecutive: 3 },
-  { type: "Maternity Leave", entitlement: 90, carryover: 0, maxConsecutive: 90 }
-];
+import { useLeaveRequests } from "@/hooks/useLeaveRequests";
+import { useEmployees } from "@/hooks/useEmployees";
+import { useProfiles } from "@/hooks/useProfiles";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LeaveAdministrationPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const { user } = useAuth();
+  
+  // Use real data hooks
+  const { leaveRequests, isLoadingLeaveRequests, updateLeaveRequest } = useLeaveRequests();
+  const { employees } = useEmployees();
+  const { profiles } = useProfiles();
+
+  // Filter data by tenant
+  const tenantLeaveRequests = leaveRequests?.filter(lr => lr.tenant_id === user?.tenant_id) || [];
+  const tenantEmployees = employees?.filter(emp => emp.tenant_id === user?.tenant_id) || [];
+
+  const getEmployeeInfo = (employeeId: string) => {
+    const employee = tenantEmployees.find(emp => emp.id === employeeId);
+    if (!employee) return { name: 'Unknown Employee', email: '' };
+    
+    const profile = profiles?.find(p => p.id === employee.user_id);
+    const name = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Unknown';
+    return { name: name || 'Unknown', email: profile?.email || '' };
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "Approved":
+      case "approved":
         return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
-      case "Rejected":
+      case "rejected":
         return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
-      case "Pending":
+      case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800"><AlertCircle className="h-3 w-3 mr-1" />Pending</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  const pendingRequests = mockLeaveRequests.filter(req => req.status === "Pending").length;
-  const approvedThisMonth = mockLeaveRequests.filter(req => req.status === "Approved").length;
-  const totalDaysRequested = mockLeaveRequests.reduce((sum, req) => sum + req.days, 0);
+  const handleApprove = async (requestId: string, employeeName: string) => {
+    try {
+      await updateLeaveRequest({ 
+        id: requestId, 
+        updates: { 
+          status: 'approved',
+          approved_by: user?.id,
+          approved_at: new Date().toISOString()
+        } 
+      });
+      toast.success(`Approved leave request for ${employeeName}`);
+    } catch (error) {
+      toast.error('Failed to approve leave request');
+    }
+  };
+
+  const handleReject = async (requestId: string, employeeName: string) => {
+    try {
+      await updateLeaveRequest({ 
+        id: requestId, 
+        updates: { 
+          status: 'rejected',
+          approved_by: user?.id,
+          approved_at: new Date().toISOString()
+        } 
+      });
+      toast.error(`Rejected leave request for ${employeeName}`);
+    } catch (error) {
+      toast.error('Failed to reject leave request');
+    }
+  };
+
+  const pendingRequests = tenantLeaveRequests.filter(req => req.status === "pending").length;
+  const approvedThisMonth = tenantLeaveRequests.filter(req => req.status === "approved").length;
+  const totalDaysRequested = tenantLeaveRequests.reduce((sum, req) => sum + req.days_requested, 0);
 
   return (
     <div className="space-y-6">
@@ -137,7 +131,9 @@ export default function LeaveAdministrationPage() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">68%</div>
+            <div className="text-2xl font-bold">
+              {tenantEmployees.length > 0 ? Math.round((approvedThisMonth / tenantEmployees.length) * 100) : 0}%
+            </div>
             <p className="text-xs text-muted-foreground">Average leave usage</p>
           </CardContent>
         </Card>
@@ -158,59 +154,74 @@ export default function LeaveAdministrationPage() {
               <CardDescription>Review and approve employee leave requests</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Start Date</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead>Days</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockLeaveRequests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell className="font-medium">{request.employee}</TableCell>
-                      <TableCell>{request.type}</TableCell>
-                      <TableCell>{new Date(request.startDate).toLocaleDateString()}</TableCell>
-                      <TableCell>{new Date(request.endDate).toLocaleDateString()}</TableCell>
-                      <TableCell>{request.days}</TableCell>
-                      <TableCell>{getStatusBadge(request.status)}</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          {request.status === "Pending" && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => toast.success(`Approved leave for ${request.employee}`)}
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => toast.error(`Rejected leave for ${request.employee}`)}
-                              >
-                                Reject
-                              </Button>
-                            </>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => toast.info(`Viewing details for ${request.employee}'s request`)}
-                          >
-                            View
-                          </Button>
-                        </div>
-                      </TableCell>
+              {isLoadingLeaveRequests ? (
+                <div className="text-center py-8">Loading leave requests...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead>Days</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {tenantLeaveRequests.length > 0 ? (
+                      tenantLeaveRequests.map((request) => {
+                        const employeeInfo = getEmployeeInfo(request.employee_id);
+                        return (
+                          <TableRow key={request.id}>
+                            <TableCell className="font-medium">{employeeInfo.name}</TableCell>
+                            <TableCell>{request.leave_type}</TableCell>
+                            <TableCell>{new Date(request.start_date).toLocaleDateString()}</TableCell>
+                            <TableCell>{new Date(request.end_date).toLocaleDateString()}</TableCell>
+                            <TableCell>{request.days_requested}</TableCell>
+                            <TableCell>{getStatusBadge(request.status)}</TableCell>
+                            <TableCell>
+                              <div className="flex space-x-2">
+                                {request.status === "pending" && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleApprove(request.id, employeeInfo.name)}
+                                    >
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleReject(request.id, employeeInfo.name)}
+                                    >
+                                      Reject
+                                    </Button>
+                                  </>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toast.info(`Viewing details for ${employeeInfo.name}'s request`)}
+                                >
+                                  View
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                          No leave requests found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -233,23 +244,34 @@ export default function LeaveAdministrationPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockLeaveBalances.map((balance, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{balance.employee}</TableCell>
-                      <TableCell>{balance.annualLeave} days</TableCell>
-                      <TableCell>{balance.sickLeave} days</TableCell>
-                      <TableCell>{balance.personalLeave} days</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toast.info("Adjust balance functionality not implemented yet")}
-                        >
-                          Adjust
-                        </Button>
+                  {tenantEmployees.length > 0 ? (
+                    tenantEmployees.map((employee) => {
+                      const employeeInfo = getEmployeeInfo(employee.id);
+                      return (
+                        <TableRow key={employee.id}>
+                          <TableCell className="font-medium">{employeeInfo.name}</TableCell>
+                          <TableCell>20 days</TableCell>
+                          <TableCell>15 days</TableCell>
+                          <TableCell>5 days</TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => toast.info("Leave balance adjustment functionality coming soon")}
+                            >
+                              Adjust
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No employees found
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -263,36 +285,9 @@ export default function LeaveAdministrationPage() {
               <CardDescription>Configure leave types and entitlements</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Leave Type</TableHead>
-                    <TableHead>Annual Entitlement</TableHead>
-                    <TableHead>Carryover Days</TableHead>
-                    <TableHead>Max Consecutive</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockLeavePolicies.map((policy, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{policy.type}</TableCell>
-                      <TableCell>{policy.entitlement} days</TableCell>
-                      <TableCell>{policy.carryover} days</TableCell>
-                      <TableCell>{policy.maxConsecutive} days</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toast.info("Edit policy functionality not implemented yet")}
-                        >
-                          Edit
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="text-center py-8 text-muted-foreground">
+                Leave policies configuration coming soon...
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -306,21 +301,29 @@ export default function LeaveAdministrationPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockLeaveRequests.filter(req => req.status === "Approved").map((leave) => (
-                    <div key={leave.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <h4 className="font-medium">{leave.employee}</h4>
-                        <p className="text-sm text-muted-foreground">{leave.type}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(leave.startDate).toLocaleDateString()} - {new Date(leave.endDate).toLocaleDateString()}
-                        </p>
+                  {tenantLeaveRequests.filter(req => req.status === "approved").map((leave) => {
+                    const employeeInfo = getEmployeeInfo(leave.employee_id);
+                    return (
+                      <div key={leave.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <h4 className="font-medium">{employeeInfo.name}</h4>
+                          <p className="text-sm text-muted-foreground">{leave.leave_type}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(leave.start_date).toLocaleDateString()} - {new Date(leave.end_date).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">{leave.days_requested} days</p>
+                          {getStatusBadge(leave.status)}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{leave.days} days</p>
-                        {getStatusBadge(leave.status)}
-                      </div>
+                    );
+                  })}
+                  {tenantLeaveRequests.filter(req => req.status === "approved").length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No approved leave requests to display
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>

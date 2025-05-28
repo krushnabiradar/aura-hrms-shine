@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "@/components/ui/sonner";
-import { Clock, Users, CheckCircle, XCircle, AlertCircle, Calendar as CalendarIcon } from "lucide-react";
+import { Clock, Users, CheckCircle, XCircle, AlertCircle, Calendar as CalendarIcon, RefreshCw } from "lucide-react";
 import { useAttendance } from "@/hooks/useAttendance";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useProfiles } from "@/hooks/useProfiles";
@@ -17,13 +17,19 @@ export default function AttendanceManagementPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   
   const { user } = useAuth();
-  const { attendanceRecords, isLoadingAttendance } = useAttendance();
+  const { attendanceRecords, isLoadingAttendance, updateAttendance } = useAttendance();
   const { employees } = useEmployees();
   const { profiles } = useProfiles();
 
   // Filter data by tenant
   const tenantAttendance = attendanceRecords?.filter(ar => ar.tenant_id === user?.tenant_id) || [];
   const tenantEmployees = employees?.filter(emp => emp.tenant_id === user?.tenant_id) || [];
+
+  // Get attendance for selected date
+  const selectedDateStr = selectedDate?.toISOString().split('T')[0];
+  const selectedDateAttendance = tenantAttendance.filter(ar => 
+    ar.date === selectedDateStr
+  );
 
   // Get today's attendance
   const todayAttendance = tenantAttendance.filter(ar => 
@@ -52,16 +58,45 @@ export default function AttendanceManagementPage() {
     }
   };
 
+  const handleMarkAttendance = async (employeeId: string, status: string) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const existingRecord = todayAttendance.find(ar => ar.employee_id === employeeId);
+      
+      if (existingRecord) {
+        await updateAttendance({
+          id: existingRecord.id,
+          updates: { status }
+        });
+      }
+      
+      const employeeInfo = getEmployeeInfo(employeeId);
+      toast.success(`Marked ${employeeInfo.name} as ${status}`);
+    } catch (error) {
+      toast.error('Failed to update attendance');
+    }
+  };
+
   const totalEmployees = tenantEmployees.length;
   const presentToday = todayAttendance.filter(a => a.status === "present" || a.status === "late").length;
-  const absentToday = totalEmployees - presentToday; // Calculate absent as total - present
+  const absentToday = totalEmployees - presentToday;
   const lateToday = todayAttendance.filter(a => a.status === "late").length;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Attendance Management</h2>
-        <p className="text-muted-foreground">Monitor and manage company-wide attendance</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Attendance Management</h2>
+          <p className="text-muted-foreground">Monitor and manage company-wide attendance</p>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={() => window.location.reload()}
+          disabled={isLoadingAttendance}
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -123,8 +158,16 @@ export default function AttendanceManagementPage() {
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="md:col-span-2">
               <CardHeader>
-                <CardTitle>Today's Attendance</CardTitle>
-                <CardDescription>Real-time attendance tracking for {new Date().toLocaleDateString()}</CardDescription>
+                <CardTitle>
+                  {selectedDate?.toDateString() === new Date().toDateString() 
+                    ? "Today's Attendance" 
+                    : `Attendance for ${selectedDate?.toLocaleDateString()}`}
+                </CardTitle>
+                <CardDescription>
+                  {selectedDate?.toDateString() === new Date().toDateString() 
+                    ? "Real-time attendance tracking" 
+                    : "Historical attendance data"}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoadingAttendance ? (
@@ -142,8 +185,8 @@ export default function AttendanceManagementPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {todayAttendance.length > 0 ? (
-                        todayAttendance.map((record) => {
+                      {selectedDateAttendance.length > 0 ? (
+                        selectedDateAttendance.map((record) => {
                           const employeeInfo = getEmployeeInfo(record.employee_id);
                           return (
                             <TableRow key={record.id}>
@@ -153,13 +196,22 @@ export default function AttendanceManagementPage() {
                               <TableCell>{record.total_hours || 0}h</TableCell>
                               <TableCell>{getStatusBadge(record.status)}</TableCell>
                               <TableCell>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => toast.info(`Reviewing attendance for ${employeeInfo.name}`)}
-                                >
-                                  Review
-                                </Button>
+                                <div className="flex space-x-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleMarkAttendance(record.employee_id, 'present')}
+                                  >
+                                    Present
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleMarkAttendance(record.employee_id, 'absent')}
+                                  >
+                                    Absent
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
@@ -167,7 +219,7 @@ export default function AttendanceManagementPage() {
                       ) : (
                         <TableRow>
                           <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                            No attendance records for today
+                            No attendance records for this date
                           </TableCell>
                         </TableRow>
                       )}
@@ -212,7 +264,7 @@ export default function AttendanceManagementPage() {
                 </TableHeader>
                 <TableBody>
                   {tenantEmployees.length > 0 ? (
-                    tenantEmployees.slice(0, 5).map((employee) => {
+                    tenantEmployees.slice(0, 10).map((employee) => {
                       const employeeInfo = getEmployeeInfo(employee.id);
                       return (
                         <TableRow key={employee.id}>
@@ -223,7 +275,7 @@ export default function AttendanceManagementPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => toast.info("Schedule edit functionality not implemented yet")}
+                              onClick={() => toast.info("Schedule management coming soon")}
                             >
                               Edit Schedule
                             </Button>
@@ -265,12 +317,12 @@ export default function AttendanceManagementPage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Overtime Hours</span>
-                  <span className="font-semibold">0h</span>
-                </div>
-                <div className="flex justify-between">
                   <span>Late Arrivals</span>
                   <span className="font-semibold">{lateToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Records</span>
+                  <span className="font-semibold">{tenantAttendance.length}</span>
                 </div>
               </CardContent>
             </Card>
@@ -283,21 +335,21 @@ export default function AttendanceManagementPage() {
               <CardContent className="space-y-4">
                 <Button 
                   className="w-full"
-                  onClick={() => toast.info("Daily report export not implemented yet")}
+                  onClick={() => toast.info("Daily report export coming soon")}
                 >
                   Export Daily Report
                 </Button>
                 <Button 
                   variant="outline"
                   className="w-full"
-                  onClick={() => toast.info("Weekly report export not implemented yet")}
+                  onClick={() => toast.info("Weekly report export coming soon")}
                 >
                   Export Weekly Report
                 </Button>
                 <Button 
                   variant="outline"
                   className="w-full"
-                  onClick={() => toast.info("Monthly report export not implemented yet")}
+                  onClick={() => toast.info("Monthly report export coming soon")}
                 >
                   Export Monthly Report
                 </Button>
