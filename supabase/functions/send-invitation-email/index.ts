@@ -159,49 +159,81 @@ async function sendSMTPEmail(emailData: any, smtpConfig: any) {
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
 
-    // Helper function to send command and read response
-    async function sendCommand(command: string, expectCode?: string): Promise<string> {
-      console.log('SMTP >', command.replace(/AUTH PLAIN.*/, 'AUTH PLAIN [credentials hidden]'));
-      await tlsConn.write(encoder.encode(command + '\r\n'));
-      
+    // Helper function to read response
+    async function readResponse(): Promise<string> {
       const buffer = new Uint8Array(1024);
       const bytesRead = await tlsConn.read(buffer);
       const response = decoder.decode(buffer.subarray(0, bytesRead || 0));
       console.log('SMTP <', response.trim());
-      
-      // Check if response starts with expected code or 2xx/3xx for success
-      const responseCode = response.substring(0, 3);
-      if (expectCode) {
-        if (!response.startsWith(expectCode)) {
-          throw new Error(`SMTP Error: Expected ${expectCode}, got ${response.trim()}`);
-        }
-      } else if (!responseCode.startsWith('2') && !responseCode.startsWith('3')) {
-        throw new Error(`SMTP Error: ${response.trim()}`);
-      }
-      
       return response;
     }
 
-    // SMTP conversation
+    // Helper function to send command
+    async function sendCommand(command: string): Promise<void> {
+      console.log('SMTP >', command.replace(/AUTH PLAIN.*/, 'AUTH PLAIN [credentials hidden]'));
+      await tlsConn.write(encoder.encode(command + '\r\n'));
+    }
+
+    // Read initial server greeting (220)
+    const greeting = await readResponse();
+    if (!greeting.startsWith('220')) {
+      throw new Error(`SMTP Error: Unexpected greeting: ${greeting.trim()}`);
+    }
+
+    // Send EHLO command
     await sendCommand('EHLO localhost');
-    
+    const ehloResponse = await readResponse();
+    if (!ehloResponse.startsWith('250')) {
+      throw new Error(`SMTP Error: EHLO failed: ${ehloResponse.trim()}`);
+    }
+
+    // If not using SSL from start, upgrade to TLS
     if (!smtpConfig.secure) {
       await sendCommand('STARTTLS');
-      // Upgrade to TLS
+      const startTlsResponse = await readResponse();
+      if (!startTlsResponse.startsWith('220')) {
+        throw new Error(`SMTP Error: STARTTLS failed: ${startTlsResponse.trim()}`);
+      }
+      
+      // Upgrade connection to TLS
       const tlsUpgraded = await Deno.startTls(tlsConn, { hostname: smtpConfig.host });
+      
+      // Send EHLO again after TLS upgrade
       await sendCommand('EHLO localhost');
+      const ehloTlsResponse = await readResponse();
+      if (!ehloTlsResponse.startsWith('250')) {
+        throw new Error(`SMTP Error: EHLO after TLS failed: ${ehloTlsResponse.trim()}`);
+      }
     }
 
     // Authentication
     const authString = btoa(`\0${smtpConfig.user}\0${smtpConfig.pass}`);
-    await sendCommand(`AUTH PLAIN ${authString}`, '235');
+    await sendCommand(`AUTH PLAIN ${authString}`);
+    const authResponse = await readResponse();
+    if (!authResponse.startsWith('235')) {
+      throw new Error(`SMTP Error: Authentication failed: ${authResponse.trim()}`);
+    }
 
-    // Send email
-    await sendCommand(`MAIL FROM:<${smtpConfig.user}>`, '250');
-    await sendCommand(`RCPT TO:<${emailData.to}>`, '250');
-    await sendCommand('DATA', '354');
+    // Send email commands
+    await sendCommand(`MAIL FROM:<${smtpConfig.user}>`);
+    const mailFromResponse = await readResponse();
+    if (!mailFromResponse.startsWith('250')) {
+      throw new Error(`SMTP Error: MAIL FROM failed: ${mailFromResponse.trim()}`);
+    }
 
-    // Email headers and body - send as one block
+    await sendCommand(`RCPT TO:<${emailData.to}>`);
+    const rcptToResponse = await readResponse();
+    if (!rcptToResponse.startsWith('250')) {
+      throw new Error(`SMTP Error: RCPT TO failed: ${rcptToResponse.trim()}`);
+    }
+
+    await sendCommand('DATA');
+    const dataResponse = await readResponse();
+    if (!dataResponse.startsWith('354')) {
+      throw new Error(`SMTP Error: DATA command failed: ${dataResponse.trim()}`);
+    }
+
+    // Send email content
     const emailContent = [
       `From: ${emailData.from}`,
       `To: ${emailData.to}`,
@@ -227,17 +259,18 @@ async function sendSMTPEmail(emailData: any, smtpConfig: any) {
     await tlsConn.write(encoder.encode(emailContent + '\r\n'));
     
     // Read final response
-    const finalBuffer = new Uint8Array(1024);
-    const finalBytesRead = await tlsConn.read(finalBuffer);
-    const finalResponse = decoder.decode(finalBuffer.subarray(0, finalBytesRead || 0));
-    console.log('SMTP <', finalResponse.trim());
-
-    // Check for successful delivery
+    const finalResponse = await readResponse();
     if (!finalResponse.startsWith('250')) {
-      throw new Error(`Email delivery failed: ${finalResponse.trim()}`);
+      throw new Error(`SMTP Error: Email delivery failed: ${finalResponse.trim()}`);
     }
 
-    await sendCommand('QUIT', '221');
+    // Quit
+    await sendCommand('QUIT');
+    const quitResponse = await readResponse();
+    if (!quitResponse.startsWith('221')) {
+      console.warn(`SMTP Warning: Unexpected QUIT response: ${quitResponse.trim()}`);
+    }
+
     tlsConn.close();
 
     return { success: true, messageId: 'smtp-sent' };
