@@ -109,21 +109,39 @@ export const useInvitations = () => {
     try {
       console.log('Validating invitation token:', token);
       
-      // First try to get the invitation directly from the table
-      const { data: invitation, error } = await supabase
-        .from('invitations')
-        .select('*')
-        .eq('token', token)
-        .maybeSingle();
+      // Try multiple token formats to handle encoding issues
+      const tokensToTry = [
+        token,
+        decodeURIComponent(token),
+        token.replace(/\s/g, '+'), // Replace spaces with + if any
+      ];
+      
+      let invitation = null;
+      
+      for (const tokenVariant of tokensToTry) {
+        console.log('Trying token variant:', tokenVariant);
+        
+        const { data, error } = await supabase
+          .from('invitations')
+          .select('*')
+          .eq('token', tokenVariant)
+          .maybeSingle();
 
-      if (error) {
-        console.error('Error fetching invitation:', error);
-        throw new Error('Failed to validate invitation');
+        if (error) {
+          console.error('Error fetching invitation:', error);
+          continue; // Try next variant
+        }
+
+        if (data) {
+          invitation = data;
+          console.log('Found invitation with token variant:', tokenVariant);
+          break;
+        }
       }
 
       if (!invitation) {
-        console.log('No invitation found for token');
-        return { is_valid: false, message: 'Invitation not found' };
+        console.log('No invitation found for any token variant');
+        return { is_valid: false, message: 'Invitation not found or has expired' };
       }
 
       // Check if invitation has expired
@@ -148,7 +166,7 @@ export const useInvitations = () => {
       };
     } catch (error) {
       console.error('Error validating invitation:', error);
-      throw error;
+      return { is_valid: false, message: 'Failed to validate invitation' };
     }
   };
 

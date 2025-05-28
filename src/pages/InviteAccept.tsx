@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,12 +23,49 @@ const InviteAccept = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState<'validate' | 'signup' | 'complete'>('validate');
+  const [hasValidated, setHasValidated] = useState(false);
   
   // Form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+
+  // Memoize the validation function to prevent infinite loops
+  const validateToken = useCallback(async (tokenValue: string) => {
+    if (hasValidated) return; // Prevent multiple validations
+    
+    try {
+      console.log('Starting token validation...');
+      setIsValidating(true);
+      setError('');
+      setHasValidated(true);
+      
+      // Decode the token if it's URL encoded
+      const decodedToken = decodeURIComponent(tokenValue);
+      console.log('Original token:', tokenValue);
+      console.log('Decoded token:', decodedToken);
+      
+      const result = await validateInvitation(decodedToken);
+      console.log('Validation result:', result);
+      
+      if (result && result.is_valid) {
+        setInvitation(result);
+        // Only access email if the result is valid and contains invitation data
+        if ('email' in result) {
+          setEmail(result.email);
+        }
+        setStep('signup');
+      } else {
+        setError(result?.message || 'This invitation is invalid or has expired');
+      }
+    } catch (err: any) {
+      console.error('Validation error:', err);
+      setError('Failed to validate invitation. Please try again.');
+    } finally {
+      setIsValidating(false);
+    }
+  }, [validateInvitation, hasValidated]);
 
   useEffect(() => {
     if (!token) {
@@ -37,40 +75,9 @@ const InviteAccept = () => {
       return;
     }
 
-    const validateToken = async () => {
-      try {
-        console.log('Starting token validation...');
-        setIsValidating(true);
-        setError('');
-        
-        const result = await validateInvitation(token);
-        console.log('Validation result:', result);
-        
-        if (result && result.is_valid) {
-          setInvitation(result);
-          // Only access email if the result is valid and contains invitation data
-          if ('email' in result) {
-            setEmail(result.email);
-          }
-          setStep('signup');
-        } else {
-          setError(result?.message || 'This invitation is invalid or has expired');
-        }
-      } catch (err: any) {
-        console.error('Validation error:', err);
-        setError('Failed to validate invitation. Please try again.');
-      } finally {
-        setIsValidating(false);
-      }
-    };
-
-    // Add a small delay to prevent immediate execution
-    const timeoutId = setTimeout(() => {
-      validateToken();
-    }, 100);
-
-    return () => clearTimeout(timeoutId);
-  }, [token, validateInvitation]);
+    // Only validate once when component mounts
+    validateToken(token);
+  }, [token, validateToken]);
 
   // Redirect if already authenticated
   useEffect(() => {
