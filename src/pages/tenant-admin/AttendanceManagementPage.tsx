@@ -8,77 +8,54 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "@/components/ui/sonner";
 import { Clock, Users, CheckCircle, XCircle, AlertCircle, Calendar as CalendarIcon } from "lucide-react";
-
-const mockAttendanceData = [
-  { 
-    id: "att-001", 
-    employee: "Alice Johnson", 
-    date: "2024-01-24", 
-    clockIn: "09:00 AM", 
-    clockOut: "05:30 PM", 
-    hours: 8.5, 
-    status: "Present",
-    overtime: 0.5
-  },
-  { 
-    id: "att-002", 
-    employee: "Bob Smith", 
-    date: "2024-01-24", 
-    clockIn: "09:15 AM", 
-    clockOut: "05:45 PM", 
-    hours: 8.5, 
-    status: "Late",
-    overtime: 0.5
-  },
-  { 
-    id: "att-003", 
-    employee: "Carol White", 
-    date: "2024-01-24", 
-    clockIn: "-", 
-    clockOut: "-", 
-    hours: 0, 
-    status: "Absent",
-    overtime: 0
-  },
-  { 
-    id: "att-004", 
-    employee: "Dave Miller", 
-    date: "2024-01-24", 
-    clockIn: "08:45 AM", 
-    clockOut: "05:15 PM", 
-    hours: 8.5, 
-    status: "Present",
-    overtime: 0
-  }
-];
-
-const mockSchedules = [
-  { employee: "Alice Johnson", shift: "9:00 AM - 5:00 PM", days: "Mon-Fri" },
-  { employee: "Bob Smith", shift: "9:00 AM - 5:00 PM", days: "Mon-Fri" },
-  { employee: "Carol White", shift: "10:00 AM - 6:00 PM", days: "Mon-Fri" },
-  { employee: "Dave Miller", shift: "8:00 AM - 4:00 PM", days: "Mon-Fri" }
-];
+import { useAttendance } from "@/hooks/useAttendance";
+import { useEmployees } from "@/hooks/useEmployees";
+import { useProfiles } from "@/hooks/useProfiles";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AttendanceManagementPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  
+  const { user } = useAuth();
+  const { attendanceRecords, isLoadingAttendance } = useAttendance();
+  const { employees } = useEmployees();
+  const { profiles } = useProfiles();
+
+  // Filter data by tenant
+  const tenantAttendance = attendanceRecords?.filter(ar => ar.tenant_id === user?.tenant_id) || [];
+  const tenantEmployees = employees?.filter(emp => emp.tenant_id === user?.tenant_id) || [];
+
+  // Get today's attendance
+  const todayAttendance = tenantAttendance.filter(ar => 
+    new Date(ar.date).toDateString() === new Date().toDateString()
+  );
+
+  const getEmployeeInfo = (employeeId: string) => {
+    const employee = tenantEmployees.find(emp => emp.id === employeeId);
+    if (!employee) return { name: 'Unknown Employee', email: '' };
+    
+    const profile = profiles?.find(p => p.id === employee.user_id);
+    const name = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Unknown';
+    return { name: name || 'Unknown', email: profile?.email || '' };
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "Present":
+      case "present":
         return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Present</Badge>;
-      case "Absent":
+      case "absent":
         return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Absent</Badge>;
-      case "Late":
+      case "late":
         return <Badge className="bg-yellow-100 text-yellow-800"><AlertCircle className="h-3 w-3 mr-1" />Late</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  const totalEmployees = mockAttendanceData.length;
-  const presentToday = mockAttendanceData.filter(a => a.status === "Present" || a.status === "Late").length;
-  const absentToday = mockAttendanceData.filter(a => a.status === "Absent").length;
-  const lateToday = mockAttendanceData.filter(a => a.status === "Late").length;
+  const totalEmployees = tenantEmployees.length;
+  const presentToday = todayAttendance.filter(a => a.status === "present" || a.status === "late").length;
+  const absentToday = totalEmployees - presentToday; // Calculate absent as total - present
+  const lateToday = todayAttendance.filter(a => a.status === "late").length;
 
   return (
     <div className="space-y-6">
@@ -106,7 +83,9 @@ export default function AttendanceManagementPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{presentToday}</div>
-            <p className="text-xs text-muted-foreground">{((presentToday/totalEmployees)*100).toFixed(1)}% attendance rate</p>
+            <p className="text-xs text-muted-foreground">
+              {totalEmployees > 0 ? ((presentToday/totalEmployees)*100).toFixed(1) : 0}% attendance rate
+            </p>
           </CardContent>
         </Card>
 
@@ -117,7 +96,7 @@ export default function AttendanceManagementPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{absentToday}</div>
-            <p className="text-xs text-muted-foreground">Needs attention</p>
+            <p className="text-xs text-muted-foreground">Need follow-up</p>
           </CardContent>
         </Card>
 
@@ -148,38 +127,53 @@ export default function AttendanceManagementPage() {
                 <CardDescription>Real-time attendance tracking for {new Date().toLocaleDateString()}</CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Clock In</TableHead>
-                      <TableHead>Clock Out</TableHead>
-                      <TableHead>Hours</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mockAttendanceData.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell className="font-medium">{record.employee}</TableCell>
-                        <TableCell>{record.clockIn}</TableCell>
-                        <TableCell>{record.clockOut}</TableCell>
-                        <TableCell>{record.hours}h</TableCell>
-                        <TableCell>{getStatusBadge(record.status)}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => toast.info(`Reviewing attendance for ${record.employee}`)}
-                          >
-                            Review
-                          </Button>
-                        </TableCell>
+                {isLoadingAttendance ? (
+                  <div className="text-center py-8">Loading attendance data...</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Check In</TableHead>
+                        <TableHead>Check Out</TableHead>
+                        <TableHead>Hours</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {todayAttendance.length > 0 ? (
+                        todayAttendance.map((record) => {
+                          const employeeInfo = getEmployeeInfo(record.employee_id);
+                          return (
+                            <TableRow key={record.id}>
+                              <TableCell className="font-medium">{employeeInfo.name}</TableCell>
+                              <TableCell>{record.check_in ? new Date(record.check_in).toLocaleTimeString() : '-'}</TableCell>
+                              <TableCell>{record.check_out ? new Date(record.check_out).toLocaleTimeString() : '-'}</TableCell>
+                              <TableCell>{record.total_hours || 0}h</TableCell>
+                              <TableCell>{getStatusBadge(record.status)}</TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toast.info(`Reviewing attendance for ${employeeInfo.name}`)}
+                                >
+                                  Review
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            No attendance records for today
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
 
@@ -217,22 +211,33 @@ export default function AttendanceManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockSchedules.map((schedule, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{schedule.employee}</TableCell>
-                      <TableCell>{schedule.shift}</TableCell>
-                      <TableCell>{schedule.days}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toast.info("Schedule edit functionality not implemented yet")}
-                        >
-                          Edit Schedule
-                        </Button>
+                  {tenantEmployees.length > 0 ? (
+                    tenantEmployees.slice(0, 5).map((employee) => {
+                      const employeeInfo = getEmployeeInfo(employee.id);
+                      return (
+                        <TableRow key={employee.id}>
+                          <TableCell className="font-medium">{employeeInfo.name}</TableCell>
+                          <TableCell>9:00 AM - 5:00 PM</TableCell>
+                          <TableCell>Mon-Fri</TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => toast.info("Schedule edit functionality not implemented yet")}
+                            >
+                              Edit Schedule
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        No employees found
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -249,19 +254,23 @@ export default function AttendanceManagementPage() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between">
                   <span>Average Attendance Rate</span>
-                  <span className="font-semibold">92.5%</span>
+                  <span className="font-semibold">
+                    {totalEmployees > 0 ? ((presentToday/totalEmployees)*100).toFixed(1) : 0}%
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Total Hours Logged</span>
-                  <span className="font-semibold">1,286h</span>
+                  <span className="font-semibold">
+                    {tenantAttendance.reduce((sum, record) => sum + (record.total_hours || 0), 0)}h
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Overtime Hours</span>
-                  <span className="font-semibold">23h</span>
+                  <span className="font-semibold">0h</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Late Arrivals</span>
-                  <span className="font-semibold">7</span>
+                  <span className="font-semibold">{lateToday}</span>
                 </div>
               </CardContent>
             </Card>

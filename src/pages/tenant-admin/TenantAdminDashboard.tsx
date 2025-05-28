@@ -32,14 +32,16 @@ import { useEmployees } from "@/hooks/useEmployees";
 import { useLeaveRequests } from "@/hooks/useLeaveRequests";
 import { useAttendance } from "@/hooks/useAttendance";
 import { useInvitations } from "@/hooks/useInvitations";
+import { useAuth } from "@/context/AuthContext";
 import { InvitationManager } from "@/components/invitations/InvitationManager";
 
 const TenantAdminDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { pathname } = useLocation();
+  const { user } = useAuth();
   
   // Use real data hooks
-  const { employees, isLoadingEmployees } = useEmployees();
+  const { employees, isLoadingEmployees, createEmployee } = useEmployees();
   const { leaveRequests, isLoadingLeaveRequests } = useLeaveRequests();
   const { attendanceRecords, isLoadingAttendance } = useAttendance();
   const { invitations, isLoadingInvitations } = useInvitations();
@@ -54,22 +56,27 @@ const TenantAdminDashboard = () => {
   }, []);
 
   const handleAddEmployee = () => {
-    toast.info("Add employee functionality not implemented yet");
+    toast.info("Use the Employee Management page to add new employees or send invitations");
   };
 
-  // Calculate statistics from real data
-  const totalEmployees = employees?.length || 0;
-  const pendingLeaveRequests = leaveRequests?.filter(lr => lr.status === 'pending').length || 0;
-  const todayAttendance = attendanceRecords?.filter(ar => 
+  // Calculate statistics from real data - filter by tenant
+  const tenantEmployees = employees?.filter(emp => emp.tenant_id === user?.tenant_id) || [];
+  const tenantLeaveRequests = leaveRequests?.filter(lr => lr.tenant_id === user?.tenant_id) || [];
+  const tenantAttendance = attendanceRecords?.filter(ar => ar.tenant_id === user?.tenant_id) || [];
+  const tenantInvitations = invitations?.filter(inv => inv.tenant_id === user?.tenant_id) || [];
+
+  const totalEmployees = tenantEmployees.length;
+  const pendingLeaveRequests = tenantLeaveRequests.filter(lr => lr.status === 'pending').length;
+  const todayAttendance = tenantAttendance.filter(ar => 
     new Date(ar.date).toDateString() === new Date().toDateString()
-  ).length || 0;
-  const pendingInvitations = invitations?.filter(i => !i.accepted_at).length || 0;
+  ).length;
+  const pendingInvitations = tenantInvitations.filter(i => !i.accepted_at).length;
 
   // Get recent employees (last 5)
-  const recentEmployees = employees?.slice(-5) || [];
+  const recentEmployees = tenantEmployees.slice(-5);
   
   // Get pending requests for approval
-  const pendingRequests = leaveRequests?.filter(lr => lr.status === 'pending').slice(0, 3) || [];
+  const pendingRequests = tenantLeaveRequests.filter(lr => lr.status === 'pending').slice(0, 3);
 
   // Route to appropriate page based on pathname
   const renderPage = () => {
@@ -106,14 +113,14 @@ const TenantAdminDashboard = () => {
                 title="Total Employees"
                 value={isLoadingEmployees ? "Loading..." : totalEmployees.toString()}
                 icon={Users}
-                trend={3.2}
-                trendLabel="from last month"
+                trend={totalEmployees > 0 ? 3.2 : 0}
+                trendLabel="employees in your organization"
               />
               <DashboardCard
                 title="Leave Requests"
                 value={isLoadingLeaveRequests ? "Loading..." : pendingLeaveRequests.toString()}
                 icon={Calendar}
-                trend={-2.5}
+                trend={pendingLeaveRequests > 0 ? -2.5 : 0}
                 trendLabel="pending approval"
               />
               <DashboardCard
@@ -177,7 +184,7 @@ const TenantAdminDashboard = () => {
                       ) : (
                         <TableRow>
                           <TableCell colSpan={4} className="text-center text-muted-foreground">
-                            No employees found
+                            No employees found. Start by sending invitations to your team.
                           </TableCell>
                         </TableRow>
                       )}
@@ -210,7 +217,7 @@ const TenantAdminDashboard = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => toast.info(`Viewing leave request`)}
+                            onClick={() => toast.info(`Viewing leave request details`)}
                           >
                             Review
                           </Button>
@@ -237,7 +244,7 @@ const TenantAdminDashboard = () => {
                     <UserCheck className="h-16 w-16" />
                     <p>Attendance chart will appear here</p>
                     {!isLoadingAttendance && (
-                      <p className="text-sm">Total records: {attendanceRecords?.length || 0}</p>
+                      <p className="text-sm">Total records: {tenantAttendance.length}</p>
                     )}
                   </div>
                 </CardContent>
