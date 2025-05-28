@@ -109,16 +109,23 @@ export const useInvitations = () => {
     try {
       console.log('Validating invitation token:', token);
       
-      // Try multiple token formats to handle encoding issues
+      // Create multiple token variants to handle URL encoding issues
       const tokensToTry = [
-        token,
-        decodeURIComponent(token),
-        token.replace(/\s/g, '+'), // Replace spaces with + if any
+        token,                              // Original token
+        decodeURIComponent(token),          // URL decoded
+        token.replace(/\s/g, '+'),          // Replace spaces with +
+        decodeURIComponent(token).replace(/\s/g, '+'), // URL decoded and spaces to +
+        token.replace(/\+/g, ' '),          // Replace + with spaces
+        token.replace(/%20/g, '+'),         // Replace %20 with +
+        token.replace(/%2B/g, '+'),         // Replace %2B with +
       ];
+      
+      // Remove duplicates
+      const uniqueTokens = [...new Set(tokensToTry)];
       
       let invitation = null;
       
-      for (const tokenVariant of tokensToTry) {
+      for (const tokenVariant of uniqueTokens) {
         console.log('Trying token variant:', tokenVariant);
         
         const { data, error } = await supabase
@@ -128,7 +135,7 @@ export const useInvitations = () => {
           .maybeSingle();
 
         if (error) {
-          console.error('Error fetching invitation:', error);
+          console.error('Error fetching invitation for variant:', tokenVariant, error);
           continue; // Try next variant
         }
 
@@ -179,9 +186,12 @@ export const useInvitations = () => {
       throw new Error('User must be authenticated to accept invitation');
     }
 
+    // Use the same token normalization logic as validation
+    const normalizedToken = token.replace(/\s/g, '+');
+
     const { data, error } = await supabase
       .rpc('accept_invitation', {
-        token_value: token,
+        token_value: normalizedToken,
         user_id: authUser.id,
         first_name: firstName,
         last_name: lastName
