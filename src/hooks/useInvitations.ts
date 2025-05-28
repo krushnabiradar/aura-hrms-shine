@@ -104,41 +104,75 @@ export const useInvitations = () => {
     }
   });
 
-  // Function to validate invitation token using the database function
+  // Function to validate invitation token
   const validateInvitation = async (token: string) => {
     try {
-      console.log('Validating invitation token using database function:', token);
+      console.log('Validating invitation token:', token);
       
-      // Use the existing database function that bypasses RLS
-      const { data, error } = await supabase
-        .rpc('validate_invitation_token', { token_value: token });
+      // Clean the token - remove any whitespace and decode if needed
+      const cleanToken = token.trim();
+      console.log('Cleaned token:', cleanToken);
+      
+      // First try using the database function
+      const { data: functionResult, error: functionError } = await supabase
+        .rpc('validate_invitation_token', { token_value: cleanToken });
 
-      if (error) {
-        console.error('Error validating invitation:', error);
+      if (functionError) {
+        console.error('Database function error:', functionError);
+        // Fall back to direct query if function fails
+      } else if (functionResult && functionResult.length > 0) {
+        const invitation = functionResult[0];
+        console.log('Function validation result:', invitation);
+        
+        if (invitation.is_valid) {
+          return { 
+            is_valid: true, 
+            id: invitation.invitation_id,
+            email: invitation.email,
+            tenant_id: invitation.tenant_id,
+            role: invitation.role
+          };
+        } else {
+          return { is_valid: false, message: 'Invitation has expired or has already been used' };
+        }
+      }
+
+      // Fallback: Direct query to invitations table
+      console.log('Falling back to direct invitation query...');
+      const { data: directData, error: directError } = await supabase
+        .from('invitations')
+        .select('*')
+        .eq('token', cleanToken)
+        .maybeSingle();
+
+      if (directError) {
+        console.error('Direct query error:', directError);
         return { is_valid: false, message: 'Failed to validate invitation' };
       }
 
-      console.log('Database function result:', data);
-
-      if (!data || data.length === 0) {
+      if (!directData) {
         console.log('No invitation found for token');
-        return { is_valid: false, message: 'Invitation not found or has expired' };
+        return { is_valid: false, message: 'Invitation not found' };
       }
 
-      const invitation = data[0];
-      
-      if (!invitation.is_valid) {
-        console.log('Invitation is not valid');
+      console.log('Direct query result:', directData);
+
+      // Check if invitation is valid
+      const now = new Date();
+      const expiresAt = new Date(directData.expires_at);
+      const isValid = expiresAt > now && !directData.accepted_at;
+
+      if (!isValid) {
+        console.log('Invitation is not valid - expired or already accepted');
         return { is_valid: false, message: 'Invitation has expired or has already been used' };
       }
 
-      console.log('Invitation is valid:', invitation);
       return { 
         is_valid: true, 
-        id: invitation.invitation_id,
-        email: invitation.email,
-        tenant_id: invitation.tenant_id,
-        role: invitation.role
+        id: directData.id,
+        email: directData.email,
+        tenant_id: directData.tenant_id,
+        role: directData.role
       };
     } catch (error) {
       console.error('Error validating invitation:', error);
@@ -146,26 +180,57 @@ export const useInvitations = () => {
     }
   };
 
-  // Function to mark invitation as accepted (can be called after signup)
+  // Function to mark invitation as accepted
   const markInvitationAccepted = async (token: string) => {
     try {
       console.log('Marking invitation as accepted...');
       
-      const { data, error } = await supabase
-        .rpc('accept_invitation', {
-          token_value: token,
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          first_name: '',
-          last_name: ''
-        });
-
-      if (error) {
-        console.error('Error marking invitation as accepted:', error);
-        throw error;
+      const cleanToken = token.trim();
+      const currentUser = (await supabase.auth.getUser()).data.user;
+      
+      if (!currentUser) {
+        throw new Error('No authenticated user found');
       }
+      
+      // Try using the database function first
+      try {
+        const { data, error } = await supabase
+          .rpc('accept_invitation', {
+            token_value: cleanToken,
+            user_id: currentUser.id,
+            first_name: currentUser.user_metadata?.first_name || '',
+            last_name: currentUser.user_metadata?.last_name || ''
+          });
 
-      console.log('Invitation marked as accepted successfully:', data);
-      return data;
+        if (error) {
+          console.error('Database function error:', error);
+          throw error;
+        }
+
+        console.log('Invitation accepted via function:', data);
+        return data;
+      } catch (functionError) {
+        console.error('Function failed, trying direct update:', functionError);
+        
+        // Fallback: Direct update
+        const { data, error } = await supabase
+          .from('invitations')
+          .update({ 
+            accepted_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('token', cleanToken)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Direct update error:', error);
+          throw error;
+        }
+
+        console.log('Invitation marked as accepted via direct update:', data);
+        return data;
+      }
     } catch (error) {
       console.error('Error in markInvitationAccepted:', error);
       throw error;

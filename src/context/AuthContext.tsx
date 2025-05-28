@@ -190,11 +190,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .eq('id', currentSessions[0].id);
       }
 
+      // Create unique session token to avoid duplicates
+      const uniqueSessionToken = `${sessionToken}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
       const { error } = await supabase
         .from('user_sessions')
         .insert({
           user_id: session.user.id,
-          session_token: sessionToken,
+          session_token: uniqueSessionToken, // Use unique token
           expires_at: expiresAt,
           ip_address: ipAddress,
           user_agent: userAgent
