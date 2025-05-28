@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -49,7 +48,10 @@ const InviteAccept = () => {
         
         if (result && result.is_valid) {
           setInvitation(result);
-          setEmail(result.email);
+          // Only access email if the result is valid and contains invitation data
+          if ('email' in result) {
+            setEmail(result.email);
+          }
           setStep('signup');
         } else {
           setError(result?.message || 'This invitation is invalid or has expired');
