@@ -33,7 +33,7 @@ const App = () => (
               <Route path="/landing" element={<Landing />} />
               <Route path="/login" element={<Auth />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/invite" element={<InviteAccept />} />
+              <Route path="/invite-accept" element={<InviteAccept />} />
               
               {/* System Admin Routes */}
               <Route element={<ProtectedRoute allowedRoles={["system_admin"]} />}>
