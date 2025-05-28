@@ -54,13 +54,8 @@ const App = () => (
               <Route path="/tenant-admin/leave" element={<TenantAdminDashboard />} />
               <Route path="/tenant-admin/payroll" element={<TenantAdminDashboard />} />
               <Route path="/tenant-admin/recruitment" element={<TenantAdminDashboard />} />
-              <Route path="/tenant-admin/performance" element={<TenantAdminDashboard />} />
-              <Route path="/tenant-admin/advanced-analytics" element={<TenantAdminDashboard />} />
               <Route path="/tenant-admin/reports" element={<TenantAdminDashboard />} />
               <Route path="/tenant-admin/documents" element={<TenantAdminDashboard />} />
-              <Route path="/tenant-admin/mobile-support" element={<TenantAdminDashboard />} />
-              <Route path="/tenant-admin/api-integration" element={<TenantAdminDashboard />} />
-              <Route path="/tenant-admin/security" element={<TenantAdminDashboard />} />
               <Route path="/tenant-admin/settings" element={<TenantAdminDashboard />} />
               <Route path="/tenant-admin/help" element={<TenantAdminDashboard />} />
             </Route>

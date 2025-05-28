@@ -9,26 +9,22 @@ import AttendanceManagementPage from "./AttendanceManagementPage";
 import LeaveAdministrationPage from "./LeaveAdministrationPage";
 import PayrollProcessingPage from "./PayrollProcessingPage";
 
-// Import Phase 2 pages
+// Import new Phase 2 pages
 import RecruitmentManagementPage from "./RecruitmentManagementPage";
 import ReportsPage from "./ReportsPage";
 import DocumentsManagementPage from "./DocumentsManagementPage";
 import SettingsPage from "./SettingsPage";
 
-// Import Phase 3 pages
-import PerformanceManagementPage from "./PerformanceManagementPage";
-import AdvancedAnalyticsPage from "./AdvancedAnalyticsPage";
-
 // Import dashboard cards
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Clock, Calendar, DollarSign, Briefcase, BarChart3, FileText, Settings, Target, TrendingUp, Smartphone, Key, Shield } from "lucide-react";
+import { Users, Clock, Calendar, DollarSign, Briefcase, BarChart3, FileText, Settings } from "lucide-react";
 
 function TenantAdminOverview() {
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-        <p className="text-muted-foreground">Welcome to your advanced HR administration dashboard</p>
+        <p className="text-muted-foreground">Welcome to your HR administration dashboard</p>
       </div>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -91,34 +87,34 @@ function TenantAdminOverview() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Performance Reviews</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Applications</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">28</div>
-            <p className="text-xs text-muted-foreground">Due this month</p>
+            <div className="text-2xl font-bold">34</div>
+            <p className="text-xs text-muted-foreground">12 pending review</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Mobile Users</CardTitle>
-            <Smartphone className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Reports Generated</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">156</div>
-            <p className="text-xs text-muted-foreground">Active mobile sessions</p>
+            <div className="text-2xl font-bold">16</div>
+            <p className="text-xs text-muted-foreground">This month</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Security Score</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Documents</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">94%</div>
-            <p className="text-xs text-muted-foreground">Excellent security</p>
+            <div className="text-2xl font-bold">127</div>
+            <p className="text-xs text-muted-foreground">5 uploaded today</p>
           </CardContent>
         </Card>
       </div>
@@ -143,68 +139,10 @@ export default function TenantAdminDashboard() {
         return <PayrollProcessingPage />;
       case "/tenant-admin/recruitment":
         return <RecruitmentManagementPage />;
-      case "/tenant-admin/performance":
-        return <PerformanceManagementPage />;
-      case "/tenant-admin/advanced-analytics":
-        return <AdvancedAnalyticsPage />;
       case "/tenant-admin/reports":
         return <ReportsPage />;
       case "/tenant-admin/documents":
         return <DocumentsManagementPage />;
-      case "/tenant-admin/mobile-support":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight">Mobile Support</h2>
-              <p className="text-muted-foreground">Manage mobile devices and push notifications</p>
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Mobile App Management</CardTitle>
-                <CardDescription>Configure mobile app settings and push notifications</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p>Mobile support features coming soon...</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      case "/tenant-admin/api-integration":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight">API Integration</h2>
-              <p className="text-muted-foreground">Manage API keys and third-party integrations</p>
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>API Management</CardTitle>
-                <CardDescription>Create and manage API keys for system integrations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p>API integration features coming soon...</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      case "/tenant-admin/security":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight">Enhanced Security</h2>
-              <p className="text-muted-foreground">Manage security policies and monitor incidents</p>
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Security Management</CardTitle>
-                <CardDescription>Configure security policies and monitor security incidents</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p>Enhanced security features coming soon...</p>
-              </CardContent>
-            </Card>
-          </div>
-        );
       case "/tenant-admin/settings":
         return <SettingsPage />;
       case "/tenant-admin/help":
